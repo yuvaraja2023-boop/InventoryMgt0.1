@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings & Demo Data - Smart Inventory System{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">System Configuration & Data Control</h1>
+    <p class="page-subtitle">Configure organization settings, currency preferences, and manage test demonstration datasets.</p>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- General Settings Form -->
+  <div class="col-lg-7">
+    <div class="card-custom h-100">
+      <div class="card-custom-header">
+        <h3 class="card-custom-title"><i class="bi bi-sliders text-secondary"></i> Inventory System Parameters</h3>
+      </div>
+      <div class="card-custom-body">
+        <form id="systemSettingsForm">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Company / Warehouse Name</label>
+            <input type="text" class="form-control form-control-custom" id="settingCompanyName" value="{{ company_name }}" required>
+            <div class="form-text">Displayed on dashboard, print banners, and reports.</div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Currency Symbol</label>
+              <select class="form-select form-select-custom" id="settingCurrency">
+                <option value="$" {% if currency_symbol == '$' %}selected{% endif %}>$ (USD / Dollar)</option>
+                <option value="₹" {% if currency_symbol == '₹' %}selected{% endif %}>₹ (INR / Rupee)</option>
+                <option value="€" {% if currency_symbol == '€' %}selected{% endif %}>€ (EUR / Euro)</option>
+                <option value="£" {% if currency_symbol == '£' %}selected{% endif %}>£ (GBP / Pound)</option>
+                <option value="¥" {% if currency_symbol == '¥' %}selected{% endif %}>¥ (JPY / Yen)</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Reorder Target Multiplier</label>
+              <input type="number" step="0.5" min="1.0" max="5.0" class="form-control form-control-custom" id="settingTargetMultiplier" value="2.0" required>
+              <div class="form-text">Replenishment recommendation = (Min Threshold &times; Multiplier) - Current Stock.</div>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="settingEnableBanner" checked>
+              <label class="form-check-label small fw-semibold" for="settingEnableBanner">
+                Display Critical Low-Stock Alert Banner on Dashboard
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-secondary-custom">
+            <i class="bi bi-save2"></i> Save Settings
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCM Academic Project Architecture Information -->
+  <div class="col-lg-5">
+    <div class="card-custom h-100">
+      <div class="card-custom-header">
+        <h3 class="card-custom-title"><i class="bi bi-mortarboard-fill text-secondary"></i> SCM Project Architecture</h3>
+      </div>
+      <div class="card-custom-body small">
+        <div class="mb-3">
+          <div class="fw-bold text-main">Software Configuration Management (SCM)</div>
+          <div class="text-muted">Academic Project Demonstration Version</div>
+        </div>
+
+        <ul class="list-group list-group-flush mb-3">
+          <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0">
+            <span>Backend Framework:</span>
+            <span class="badge bg-primary-subtle text-primary">Python 3.11 / Flask</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0">
+            <span>Database Engine:</span>
+            <span class="badge bg-secondary-subtle text-secondary">SQLite3 (Foreign Keys Enabled)</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0">
+            <span>Frontend Architecture:</span>
+            <span class="badge bg-info-subtle text-info">Bootstrap 5 + Chart.js</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0">
+            <span>CI / CD Pipeline:</span>
+            <span class="badge bg-success-subtle text-success">Jenkins (`Jenkinsfile`)</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0">
+            <span>Test Suite:</span>
+            <span class="badge bg-warning-subtle text-warning">Pytest (`pytest.ini`)</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0">
+            <span>Authentication Mode:</span>
+            <span class="badge bg-success-subtle text-success">Zero Auth / Instant Access</span>
+          </li>
+        </ul>
+
+        <div class="text-muted" style="font-size: 0.75rem;">
+          Designed without authentication gates for smooth college project evaluation and CI pipeline verification.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- DEMO DATA & DATABASE CONTROLS                                          -->
+<!-- ====================================================================== -->
+<div class="card-custom border-danger-subtle">
+  <div class="card-custom-header">
+    <h3 class="card-custom-title text-danger">
+      <i class="bi bi-database-gear"></i> Demonstration Data & Database Controls
+    </h3>
+  </div>
+  <div class="card-custom-body">
+    <div class="row g-4 align-items-center">
+      <div class="col-md-8">
+        <h6 class="fw-bold mb-1">Demonstration Dataset Provisioning</h6>
+        <p class="text-muted small mb-0">
+          Load a realistic catalog of products, active suppliers, low-stock triggers, and initial transactions to demonstrate all charts, alerts, and valuation metrics for presentation.
+        </p>
+      </div>
+      <div class="col-md-4 text-md-end">
+        <button class="btn btn-outline-custom" id="seedDemoDataBtn">
+          <i class="bi bi-cloud-arrow-down-fill text-primary"></i> Load Demo Data
+        </button>
+      </div>
+    </div>
+
+    <hr class="my-4">
+
+    <div class="row g-4 align-items-center">
+      <div class="col-md-8">
+        <h6 class="fw-bold text-danger mb-1">Reset All Inventory Data</h6>
+        <p class="text-muted small mb-0">
+          Clears all products, suppliers, and transaction history. Table schemas and configuration remain intact.
+        </p>
+      </div>
+      <div class="col-md-4 text-md-end">
+        <button class="btn btn-danger" id="clearDataBtn">
+          <i class="bi bi-trash3-fill"></i> Clear All Records
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Save settings
+  document.getElementById('systemSettingsForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      company_name: document.getElementById('settingCompanyName').value,
+      currency_symbol: document.getElementById('settingCurrency').value,
+      target_stock_multiplier: document.getElementById('settingTargetMultiplier').value,
+      enable_low_stock_banner: document.getElementById('settingEnableBanner').checked ? '1' : '0'
+    };
+
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message, 'success');
+        setTimeout(() => { window.location.reload(); }, 600);
+      } else {
+        showToast(data.error || 'Failed to save settings', 'danger');
+      }
+    } catch (err) {
+      showToast('Network error saving settings', 'danger');
+    }
+  });
+
+  // Load Demo Data
+  document.getElementById('seedDemoDataBtn').addEventListener('click', async () => {
+    if (!confirm('Load demonstration sample inventory and transaction history?')) return;
+
+    try {
+      const res = await fetch('/api/demo/seed', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message, 'success');
+        setTimeout(() => { window.location.href = '/'; }, 800);
+      } else {
+        showToast(data.error || 'Failed to seed demo data', 'warning');
+      }
+    } catch (err) {
+      showToast('Network error loading demo data', 'danger');
+    }
+  });
+
+  // Clear All Data
+  document.getElementById('clearDataBtn').addEventListener('click', async () => {
+    if (!confirm('CAUTION: Are you sure you want to clear ALL inventory items, suppliers, and transactions? This cannot be undone.')) return;
+
+    try {
+      const res = await fetch('/api/demo/clear', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message, 'success');
+        setTimeout(() => { window.location.href = '/'; }, 800);
+      } else {
+        showToast(data.error || 'Failed to clear data', 'danger');
+      }
+    } catch (err) {
+      showToast('Network error clearing data', 'danger');
+    }
+  });
+});
+</script>
+{% endblock %}

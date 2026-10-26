@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+
+{% block title %}Reports & Analytics - Smart Inventory System{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Reports & Business Analytics</h1>
+    <p class="page-subtitle">Generate audit summaries, valuation statements, and download CSV reports.</p>
+  </div>
+  <div class="header-action-group">
+    <button class="btn btn-outline-custom" onclick="window.print()">
+      <i class="bi bi-printer"></i> Print Summary
+    </button>
+    <a href="{{ url_for('export_products_csv') }}" class="btn btn-primary-custom" id="exportCurrentReportCsvBtn">
+      <i class="bi bi-file-earmark-spreadsheet"></i> Export to CSV
+    </a>
+  </div>
+</div>
+
+<!-- Report Selection Toolbar -->
+<div class="card-custom mb-4 no-print">
+  <div class="card-custom-body">
+    <div class="row g-3 align-items-center">
+      <div class="col-lg-5 col-md-6">
+        <label class="form-label small fw-semibold">Select Report Type</label>
+        <select class="form-select form-select-custom" id="reportTypeSelect">
+          <option value="inventory_valuation">1. Inventory Valuation Statement</option>
+          <option value="current_inventory">2. Current Inventory Master Report</option>
+          <option value="low_stock">3. Low-Stock Replenishment Report</option>
+          <option value="out_of_stock">4. Out-of-Stock Critical Report</option>
+          <option value="stock_in">5. Stock-In Receipts Summary</option>
+          <option value="stock_out">6. Stock-Out Dispatches Summary</option>
+          <option value="supplier_report">7. Supplier Performance & Sourcing</option>
+          <option value="transactions_report">8. Full Transactions Audit Report</option>
+        </select>
+      </div>
+      <div class="col-lg-7 col-md-6 text-md-end pt-md-4">
+        <span class="badge bg-secondary-subtle text-secondary small px-3 py-2" id="reportGeneratedTime">
+          Generated in real-time from SQLite database
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- VALUATION SUMMARY CONTAINER (Active when valuation report is selected) -->
+<!-- ====================================================================== -->
+<div id="valuationSummarySection" class="mb-4">
+  <div class="alert alert-info border-0 shadow-sm d-flex align-items-center gap-2 mb-3">
+    <i class="bi bi-info-circle-fill fs-5"></i>
+    <div class="small">
+      <strong>Accounting Method:</strong> Estimated Total Inventory Value = &sum;(Current Stock Quantity &times; Unit Purchase Price). Valuation represents current cost basis of active stock.
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="stat-card">
+        <div class="stat-info">
+          <span class="stat-label">Total Cost Valuation</span>
+          <span class="stat-value text-primary" id="valTotalCost">-</span>
+          <span class="stat-meta text-muted">Sum(Qty &times; Purchase Cost)</span>
+        </div>
+        <div class="stat-icon-wrapper stat-icon-blue"><i class="bi bi-cash-stack"></i></div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card">
+        <div class="stat-info">
+          <span class="stat-label">Potential Retail Value</span>
+          <span class="stat-value text-success" id="valTotalRetail">-</span>
+          <span class="stat-meta text-muted">Sum(Qty &times; Selling Price)</span>
+        </div>
+        <div class="stat-icon-wrapper stat-icon-green"><i class="bi bi-tag-fill"></i></div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card">
+        <div class="stat-info">
+          <span class="stat-label">Projected Margin</span>
+          <span class="stat-value text-info" id="valTotalMargin">-</span>
+          <span class="stat-meta text-success" id="valMarginPct">0% Markup</span>
+        </div>
+        <div class="stat-icon-wrapper stat-icon-navy"><i class="bi bi-graph-up"></i></div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card">
+        <div class="stat-info">
+          <span class="stat-label">Total Inventory Units</span>
+          <span class="stat-value" id="valTotalUnits">-</span>
+          <span class="stat-meta text-muted" id="valTotalItems">0 Catalog Items</span>
+        </div>
+        <div class="stat-icon-wrapper stat-icon-purple"><i class="bi bi-boxes"></i></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- DYNAMIC REPORT DATA TABLE                                              -->
+<!-- ====================================================================== -->
+<div class="card-custom">
+  <div class="card-custom-header">
+    <div class="d-flex align-items-center gap-2">
+      <h3 class="card-custom-title" id="reportTitleHeader">
+        <i class="bi bi-table text-secondary"></i> Inventory Valuation by Category
+      </h3>
+    </div>
+    <span class="badge bg-secondary-subtle text-secondary small" id="reportRowCount">0 Rows</span>
+  </div>
+
+  <div class="table-custom-wrapper border-0">
+    <table class="table-custom" id="reportMainTable">
+      <thead id="reportTableHead">
+        <!-- Rendered by JS depending on report type -->
+      </thead>
+      <tbody id="reportTableBody">
+        <!-- Loaded via JS -->
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  loadReportData();
+  document.getElementById('reportTypeSelect').addEventListener('change', loadReportData);
+});
+
+async function loadReportData() {
+  const type = document.getElementById('reportTypeSelect').value;
+  const valuationSection = document.getElementById('valuationSummarySection');
+  const exportBtn = document.getElementById('exportCurrentReportCsvBtn');
+
+  // Configure CSV export target
+  if (type === 'current_inventory' || type === 'inventory_valuation') {
+    exportBtn.href = '/export/products/csv';
+  } else if (type === 'low_stock' || type === 'out_of_stock') {
+    exportBtn.href = '/export/low-stock/csv';
+  } else {
+    exportBtn.href = '/export/transactions/csv';
+  }
+
+  try {
+    const res = await fetch(`/api/reports/data?type=${type}`);
+    const data = await res.json();
+    if (!data.success) return;
+
+    if (type === 'inventory_valuation') {
+      valuationSection.classList.remove('d-none');
+      renderValuationReport(data);
+    } else {
+      valuationSection.classList.add('d-none');
+      renderStandardReport(type, data.data);
+    }
+  } catch (err) {
+    console.error('Failed to load report:', err);
+  }
+}
+
+function renderValuationReport(data) {
+  const s = data.summary;
+  document.getElementById('reportTitleHeader').innerHTML = '<i class="bi bi-cash-coin text-secondary"></i> Valuation Breakdown by Category';
+  document.getElementById('valTotalCost').textContent = `$ ${s.total_cost_value.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+  document.getElementById('valTotalRetail').textContent = `$ ${s.total_retail_value.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+  document.getElementById('valTotalMargin').textContent = `$ ${s.projected_margin.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+  document.getElementById('valMarginPct').textContent = `${s.margin_percent}% Gross Margin`;
+  document.getElementById('valTotalUnits').textContent = s.total_quantity.toLocaleString();
+  document.getElementById('valTotalItems').textContent = `${s.total_items} Unique SKUs`;
+
+  const thead = document.getElementById('reportTableHead');
+  thead.innerHTML = `
+    <tr>
+      <th>Category Name</th>
+      <th>Product SKUs</th>
+      <th>Total Quantity in Stock</th>
+      <th>Inventory Cost Basis</th>
+      <th>Potential Retail Value</th>
+      <th>Category Margin</th>
+    </tr>
+  `;
+
+  const tbody = document.getElementById('reportTableBody');
+  let html = '';
+  data.categories.forEach(c => {
+    const margin = (c.retail_value - c.cost_value);
+    html += `
+      <tr>
+        <td class="fw-bold">${escapeHtml(c.category)}</td>
+        <td>${c.items} Products</td>
+        <td>${c.total_qty.toLocaleString()} units</td>
+        <td class="fw-semibold text-primary">$ ${c.cost_value.toFixed(2)}</td>
+        <td class="fw-semibold text-success">$ ${c.retail_value.toFixed(2)}</td>
+        <td>$ ${margin.toFixed(2)}</td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+  document.getElementById('reportRowCount').textContent = `${data.categories.length} Categories`;
+}
+
+function renderStandardReport(type, rows) {
+  const thead = document.getElementById('reportTableHead');
+  const tbody = document.getElementById('reportTableBody');
+  document.getElementById('reportRowCount').textContent = `${rows ? rows.length : 0} Records`;
+
+  if (!rows || rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted p-4">No records found for this report criteria.</td></tr>`;
+    return;
+  }
+
+  if (type === 'current_inventory') {
+    document.getElementById('reportTitleHeader').innerHTML = '<i class="bi bi-boxes text-secondary"></i> Master Product Inventory Report';
+    thead.innerHTML = `
+      <tr>
+        <th>SKU</th>
+        <th>Product Name</th>
+        <th>Category</th>
+        <th>In Stock</th>
+        <th>Min Threshold</th>
+        <th>Cost Price</th>
+        <th>Selling Price</th>
+        <th>Valuation</th>
+        <th>Supplier</th>
+      </tr>
+    `;
+    let html = '';
+    rows.forEach(r => {
+      html += `
+        <tr>
+          <td><span class="font-monospace small">${escapeHtml(r.sku)}</span></td>
+          <td class="fw-semibold">${escapeHtml(r.name)}</td>
+          <td><span class="badge bg-secondary-subtle text-secondary">${escapeHtml(r.category)}</span></td>
+          <td class="fw-bold">${r.quantity} ${escapeHtml(r.unit)}</td>
+          <td>${r.minimum_stock}</td>
+          <td>$ ${Number(r.purchase_price).toFixed(2)}</td>
+          <td>$ ${Number(r.selling_price).toFixed(2)}</td>
+          <td class="fw-bold text-primary">$ ${Number(r.total_valuation).toFixed(2)}</td>
+          <td class="small">${escapeHtml(r.supplier_name || 'N/A')}</td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html;
+
+  } else if (type === 'low_stock' || type === 'out_of_stock') {
+    document.getElementById('reportTitleHeader').innerHTML = `<i class="bi bi-exclamation-triangle text-warning"></i> ${type === 'low_stock' ? 'Low-Stock Safety Level' : 'Out-of-Stock Zero Count'} Report`;
+    thead.innerHTML = `
+      <tr>
+        <th>SKU</th>
+        <th>Product Name</th>
+        <th>Category</th>
+        <th>Quantity Left</th>
+        <th>Threshold</th>
+        <th>Recommended Order</th>
+        <th>Supplier</th>
+        <th>Contact</th>
+      </tr>
+    `;
+    let html = '';
+    rows.forEach(r => {
+      html += `
+        <tr>
+          <td><span class="font-monospace small">${escapeHtml(r.sku)}</span></td>
+          <td class="fw-semibold">${escapeHtml(r.name)}</td>
+          <td><span class="badge bg-secondary-subtle text-secondary">${escapeHtml(r.category)}</span></td>
+          <td class="fw-bold ${r.quantity === 0 ? 'text-danger' : 'text-warning'}">${r.quantity} ${escapeHtml(r.unit)}</td>
+          <td>${r.minimum_stock}</td>
+          <td><span class="badge bg-primary-subtle text-primary">+${r.recommended_reorder} units</span></td>
+          <td class="small fw-medium">${escapeHtml(r.supplier_name || 'N/A')}</td>
+          <td class="small text-muted font-monospace">${escapeHtml(r.phone || r.email || '-')}</td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html;
+
+  } else if (type === 'stock_in' || type === 'stock_out') {
+    document.getElementById('reportTitleHeader').innerHTML = `<i class="bi bi-arrow-left-right text-secondary"></i> Stock Movements (${type === 'stock_in' ? 'Receipts' : 'Dispatches'}) Report`;
+    thead.innerHTML = `
+      <tr>
+        <th>Date</th>
+        <th>Product Name</th>
+        <th>SKU</th>
+        <th>Quantity</th>
+        <th>Previous</th>
+        <th>New Balance</th>
+        <th>Reference #</th>
+        <th>Reason</th>
+      </tr>
+    `;
+    let html = '';
+    rows.forEach(r => {
+      const qty = type === 'stock_in' ? `+${r.quantity_changed}` : `-${r.quantity_removed}`;
+      const color = type === 'stock_in' ? 'text-success' : 'text-danger';
+      html += `
+        <tr>
+          <td class="small fw-semibold text-nowrap">${r.created_at}</td>
+          <td class="fw-semibold">${escapeHtml(r.product_name)}</td>
+          <td><span class="font-monospace small">${escapeHtml(r.sku)}</span></td>
+          <td><span class="fw-bold ${color}">${qty}</span></td>
+          <td>${r.previous_quantity}</td>
+          <td class="fw-bold">${r.new_quantity}</td>
+          <td><span class="font-monospace small">${escapeHtml(r.reference_number)}</span></td>
+          <td class="small text-muted">${escapeHtml(r.reason)}</td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html;
+
+  } else if (type === 'supplier_report') {
+    document.getElementById('reportTitleHeader').innerHTML = '<i class="bi bi-truck text-secondary"></i> Sourcing & Supplier Valuation Report';
+    thead.innerHTML = `
+      <tr>
+        <th>Supplier</th>
+        <th>Company</th>
+        <th>Contact Person</th>
+        <th>Phone</th>
+        <th>Products Sourced</th>
+        <th>Units Stocked</th>
+        <th>Total Value Supplied</th>
+      </tr>
+    `;
+    let html = '';
+    rows.forEach(r => {
+      html += `
+        <tr>
+          <td class="fw-bold">${escapeHtml(r.supplier_name)}</td>
+          <td>${escapeHtml(r.company_name || '-')}</td>
+          <td>${escapeHtml(r.contact_person || '-')}</td>
+          <td class="font-monospace small">${escapeHtml(r.phone || '-')}</td>
+          <td><span class="badge bg-secondary-subtle text-secondary">${r.total_products_supplied} SKUs</span></td>
+          <td>${r.total_units_in_stock} units</td>
+          <td class="fw-bold text-primary">$ ${Number(r.total_inventory_value).toFixed(2)}</td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html;
+
+  } else if (type === 'transactions_report') {
+    document.getElementById('reportTitleHeader').innerHTML = '<i class="bi bi-clock-history text-secondary"></i> Complete Transaction Audit Trail';
+    thead.innerHTML = `
+      <tr>
+        <th>ID</th>
+        <th>Date</th>
+        <th>Product</th>
+        <th>Type</th>
+        <th>Delta</th>
+        <th>Previous</th>
+        <th>New Balance</th>
+        <th>Reference</th>
+        <th>Reason</th>
+      </tr>
+    `;
+    let html = '';
+    rows.forEach(r => {
+      html += `
+        <tr>
+          <td>#${r.id}</td>
+          <td class="small fw-semibold text-nowrap">${r.created_at}</td>
+          <td class="fw-semibold">${escapeHtml(r.product_name)}</td>
+          <td>${escapeHtml(r.transaction_type)}</td>
+          <td class="fw-bold ${r.quantity_changed >= 0 ? 'text-success' : 'text-danger'}">${r.quantity_changed > 0 ? '+' : ''}${r.quantity_changed}</td>
+          <td>${r.previous_quantity}</td>
+          <td class="fw-bold">${r.new_quantity}</td>
+          <td class="font-monospace small">${escapeHtml(r.reference_number)}</td>
+          <td class="small text-muted">${escapeHtml(r.reason)}</td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html;
+  }
+}
+</script>
+{% endblock %}

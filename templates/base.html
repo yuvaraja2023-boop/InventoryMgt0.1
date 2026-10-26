@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Smart Inventory Management System{% endblock %}</title>
+  <meta name="description" content="College SCM Project - Smart Inventory Management System. Manage products, stock quantities, suppliers, transactions, and automated low-stock alerts.">
+
+  <!-- Favicon / App Icon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+
+  <!-- Bootstrap 5.3.3 CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <!-- Bootstrap Icons 1.11.3 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <!-- Custom Design System -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<div class="app-wrapper">
+  <!-- ====================================================================== -->
+  <!-- LEFT FIXED / COLLAPSIBLE SIDEBAR                                       -->
+  <!-- ====================================================================== -->
+  <aside class="app-sidebar" id="appSidebar">
+    <!-- Sidebar Header & Logo -->
+    <div class="sidebar-header">
+      <a href="{{ url_for('dashboard') }}" class="sidebar-brand">
+        <div class="brand-icon">
+          <i class="bi bi-box-seam-fill"></i>
+        </div>
+        <div>
+          <div class="brand-text-title">SmartInventory</div>
+          <div class="brand-text-subtitle">SCM Enterprise Hub</div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Navigation Menu Items -->
+    <div class="sidebar-body">
+      <div class="sidebar-heading">Core Modules</div>
+
+      <!-- 1. Dashboard -->
+      <a href="{{ url_for('dashboard') }}" class="nav-link-custom {% if active_page == 'dashboard' %}active{% endif %}" id="nav-dashboard">
+        <div class="link-content">
+          <i class="bi bi-speedometer2"></i>
+          <span>Dashboard</span>
+        </div>
+      </a>
+
+      <!-- 2. Products -->
+      <a href="{{ url_for('products_page') }}" class="nav-link-custom {% if active_page == 'products' %}active{% endif %}" id="nav-products">
+        <div class="link-content">
+          <i class="bi bi-boxes"></i>
+          <span>Products</span>
+        </div>
+      </a>
+
+      <!-- 3. Stock Management -->
+      <a href="{{ url_for('stock_page') }}" class="nav-link-custom {% if active_page == 'stock' %}active{% endif %}" id="nav-stock">
+        <div class="link-content">
+          <i class="bi bi-arrow-left-right"></i>
+          <span>Stock Operations</span>
+        </div>
+      </a>
+
+      <!-- 4. Suppliers -->
+      <a href="{{ url_for('suppliers_page') }}" class="nav-link-custom {% if active_page == 'suppliers' %}active{% endif %}" id="nav-suppliers">
+        <div class="link-content">
+          <i class="bi bi-truck"></i>
+          <span>Suppliers</span>
+        </div>
+      </a>
+
+      <div class="sidebar-heading">Auditing & Reports</div>
+
+      <!-- 5. Inventory Transactions -->
+      <a href="{{ url_for('transactions_page') }}" class="nav-link-custom {% if active_page == 'transactions' %}active{% endif %}" id="nav-transactions">
+        <div class="link-content">
+          <i class="bi bi-clock-history"></i>
+          <span>Transactions Log</span>
+        </div>
+      </a>
+
+      <!-- 6. Low Stock Alerts -->
+      <a href="{{ url_for('alerts_page') }}" class="nav-link-custom {% if active_page == 'alerts' %}active{% endif %}" id="nav-alerts">
+        <div class="link-content">
+          <i class="bi bi-exclamation-triangle"></i>
+          <span>Low Stock Alerts</span>
+        </div>
+        <span class="badge bg-danger sidebar-badge" id="sidebarAlertBadge" {% if alert_count == 0 %}style="display:none;"{% endif %}>
+          {{ alert_count }}
+        </span>
+      </a>
+
+      <!-- 7. Reports & Analytics -->
+      <a href="{{ url_for('reports_page') }}" class="nav-link-custom {% if active_page == 'reports' %}active{% endif %}" id="nav-reports">
+        <div class="link-content">
+          <i class="bi bi-file-earmark-bar-graph"></i>
+          <span>Reports & Analytics</span>
+        </div>
+      </a>
+
+      <div class="sidebar-heading">System</div>
+
+      <!-- 8. Settings -->
+      <a href="{{ url_for('settings_page') }}" class="nav-link-custom {% if active_page == 'settings' %}active{% endif %}" id="nav-settings">
+        <div class="link-content">
+          <i class="bi bi-gear"></i>
+          <span>Settings & Data</span>
+        </div>
+      </a>
+    </div>
+
+    <!-- Sidebar Footer -->
+    <div class="sidebar-footer">
+      <div>
+        <i class="bi bi-mortarboard-fill me-1"></i> SCM Project 2026
+      </div>
+      <span class="badge bg-secondary-subtle text-light-emphasis">v1.2</span>
+    </div>
+  </aside>
+
+  <!-- ====================================================================== -->
+  <!-- MAIN WORKSPACE & TOPBAR                                                -->
+  <!-- ====================================================================== -->
+  <main class="app-main">
+    <!-- Topbar Header -->
+    <header class="app-topbar">
+      <div class="topbar-left">
+        <!-- Sidebar Toggle Mobile/Desktop -->
+        <button class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="Toggle Sidebar">
+          <i class="bi bi-list fs-5"></i>
+        </button>
+
+        <!-- Global Search Bar -->
+        <div class="global-search-container">
+          <i class="bi bi-search search-icon-left"></i>
+          <input type="text" class="global-search-input" id="globalSearchInput" placeholder="Quick search products, SKUs, transactions..." autocomplete="off">
+          <span class="search-kbd-hint">Ctrl+K</span>
+
+          <!-- Search Results Dropdown -->
+          <div class="search-results-dropdown" id="searchResultsDropdown"></div>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <!-- Current Date Pill -->
+        <div class="header-date-badge d-none d-md-flex">
+          <i class="bi bi-calendar3 text-secondary"></i>
+          <span>{{ current_date }}</span>
+        </div>
+
+        <!-- Low Stock Notifications Dropdown -->
+        <div class="dropdown">
+          <button class="topbar-action-btn" type="button" id="notifDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false" title="Low Stock Alerts">
+            <i class="bi bi-bell"></i>
+            <span class="notif-badge" id="notifCountBadge" {% if alert_count == 0 %}style="display:none;"{% endif %}>
+              {{ alert_count }}
+            </span>
+          </button>
+          <div class="dropdown-menu dropdown-menu-end notification-menu p-0" aria-labelledby="notifDropdownBtn">
+            <div class="notification-header">
+              <span class="fw-bold fs-6">Inventory Alerts</span>
+              <a href="{{ url_for('alerts_page') }}" class="small text-secondary fw-semibold">View All</a>
+            </div>
+            <div class="notification-list" id="notifDropdownList">
+              <div class="p-3 text-center text-muted small">Loading alerts...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Light / Dark Mode Toggle Button -->
+        <button class="topbar-action-btn" id="themeToggleBtn" type="button" title="Toggle Light / Dark Mode">
+          <i class="bi bi-moon-stars-fill text-secondary" id="themeIcon"></i>
+        </button>
+
+        <!-- Direct Action: Quick Add Product -->
+        <button class="btn btn-secondary-custom d-none d-sm-inline-flex" data-bs-toggle="modal" data-bs-target="#quickAddProductModal">
+          <i class="bi bi-plus-lg"></i>
+          <span>Add Product</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Print Header (Visible only when printing) -->
+    <div class="print-header px-4 pt-3">
+      <h2>{{ company_name }} - Smart Inventory Management</h2>
+      <p class="text-muted mb-0">Generated on: {{ current_date }} | SCM Course Audit Report</p>
+    </div>
+
+    <!-- Page Body Content Block -->
+    <div class="content-body">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
+
+<!-- ====================================================================== -->
+<!-- GLOBAL MODAL: QUICK ADD PRODUCT                                        -->
+<!-- ====================================================================== -->
+<div class="modal fade" id="quickAddProductModal" tabindex="-1" aria-labelledby="quickAddProductModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form id="globalAddProductForm">
+        <div class="modal-header">
+          <h5 class="modal-title" id="quickAddProductModalLabel">
+            <i class="bi bi-box-seam text-secondary"></i> Add New Inventory Product
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Product Name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-custom" id="globalProdName" placeholder="e.g. 24-inch Curved IPS Monitor" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Product SKU / ID <span class="text-muted fw-normal">(Leave blank to auto-generate)</span></label>
+              <input type="text" class="form-control form-control-custom" id="globalProdSku" placeholder="e.g. PRD-1090">
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Category <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-custom" list="categoryOptions" id="globalProdCategory" placeholder="e.g. Electronics, Packaging" required>
+              <datalist id="categoryOptions">
+                <option value="Electronics">
+                <option value="Packaging">
+                <option value="Raw Materials">
+                <option value="Networking">
+                <option value="Retail Hardware">
+                <option value="Power Equipment">
+                <option value="Office Supplies">
+              </datalist>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Unit of Measurement</label>
+              <input type="text" class="form-control form-control-custom" id="globalProdUnit" value="Units" placeholder="e.g. Units, Boxes, Meters, Tubes">
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Supplier</label>
+              <select class="form-select form-select-custom" id="globalProdSupplier">
+                <option value="">-- None / Select Later --</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Purchase Price ({{ currency_symbol }})</label>
+              <input type="number" step="0.01" min="0" class="form-control form-control-custom" id="globalProdPurchasePrice" value="0.00" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Selling Price ({{ currency_symbol }})</label>
+              <input type="number" step="0.01" min="0" class="form-control form-control-custom" id="globalProdSellingPrice" value="0.00" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Initial Stock Quantity</label>
+              <input type="number" min="0" class="form-control form-control-custom" id="globalProdQuantity" value="0" required>
+              <div class="form-text" style="font-size: 0.75rem;">Logs an Opening Stock transaction automatically.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Low-Stock Alert Threshold</label>
+              <input type="number" min="1" class="form-control form-control-custom" id="globalProdMinStock" value="5" required>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Description & Notes</label>
+              <textarea class="form-control form-control-custom" id="globalProdDesc" rows="2" placeholder="Brief technical specifications, shelf location, or supplier references..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-secondary-custom">
+            <i class="bi bi-check2-circle"></i> Save Product
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- GLOBAL MODAL: QUICK STOCK IN                                           -->
+<!-- ====================================================================== -->
+<div class="modal fade" id="quickStockInModal" tabindex="-1" aria-labelledby="quickStockInModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="quickStockInForm">
+        <div class="modal-header">
+          <h5 class="modal-title" id="quickStockInModalLabel">
+            <i class="bi bi-box-arrow-in-down text-success"></i> Stock In (Receive Goods)
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Select Product <span class="text-danger">*</span></label>
+            <select class="form-select form-select-custom" id="stockInProductSelect" required></select>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label small fw-semibold">Quantity Received <span class="text-danger">*</span></label>
+              <input type="number" min="1" class="form-control form-control-custom" id="stockInQuantity" placeholder="10" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold">Reference / PO #</label>
+              <input type="text" class="form-control form-control-custom" id="stockInRef" placeholder="PO-2026-001">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Supplier</label>
+            <select class="form-select form-select-custom" id="stockInSupplierSelect"></select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Notes / Batch Info</label>
+            <input type="text" class="form-control form-control-custom" id="stockInNotes" placeholder="Received at central receiving dock...">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary-custom" style="background-color: var(--success); border-color: var(--success);">
+            <i class="bi bi-check-lg"></i> Confirm Stock In
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- GLOBAL MODAL: QUICK STOCK OUT                                          -->
+<!-- ====================================================================== -->
+<div class="modal fade" id="quickStockOutModal" tabindex="-1" aria-labelledby="quickStockOutModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="quickStockOutForm">
+        <div class="modal-header">
+          <h5 class="modal-title" id="quickStockOutModalLabel">
+            <i class="bi bi-box-arrow-up text-danger"></i> Stock Out (Dispatch / Issue)
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Select Product <span class="text-danger">*</span></label>
+            <select class="form-select form-select-custom" id="stockOutProductSelect" required></select>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label small fw-semibold">Quantity to Remove <span class="text-danger">*</span></label>
+              <input type="number" min="1" class="form-control form-control-custom" id="stockOutQuantity" placeholder="5" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold">Reason <span class="text-danger">*</span></label>
+              <select class="form-select form-select-custom" id="stockOutReason" required>
+                <option value="Customer Order Dispatch">Customer Order Dispatch</option>
+                <option value="Damaged / Broken">Damaged / Broken</option>
+                <option value="Expired / Obsolete">Expired / Obsolete</option>
+                <option value="Internal Use / Demo">Internal Use / Demo</option>
+                <option value="Return to Vendor">Return to Vendor</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Sales / Dispatch Reference #</label>
+            <input type="text" class="form-control form-control-custom" id="stockOutRef" placeholder="SO-98212">
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Notes</label>
+            <input type="text" class="form-control form-control-custom" id="stockOutNotes" placeholder="Customer invoice or work order ID...">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary-custom" style="background-color: var(--danger); border-color: var(--danger);">
+            <i class="bi bi-check-lg"></i> Confirm Stock Out
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container for Dynamic Feedback Messages -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+
+<!-- Bootstrap 5.3.3 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Chart.js 4.4.1 -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- Application Global JS -->
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+  // Bind global add product modal supplier list loading and submission
+  const quickAddModalEl = document.getElementById('quickAddProductModal');
+  if (quickAddModalEl) {
+    quickAddModalEl.addEventListener('show.bs.modal', async () => {
+      const select = document.getElementById('globalProdSupplier');
+      try {
+        const res = await fetch('/api/suppliers');
+        const data = await res.json();
+        if (data.success) {
+          let html = '<option value="">-- None / Select Later --</option>';
+          data.suppliers.forEach(s => {
+            html += `<option value="${s.id}">${escapeHtml(s.supplier_name)}</option>`;
+          });
+          select.innerHTML = html;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+    const form = document.getElementById('globalAddProductForm');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        name: document.getElementById('globalProdName').value,
+        sku: document.getElementById('globalProdSku').value,
+        category: document.getElementById('globalProdCategory').value,
+        unit: document.getElementById('globalProdUnit').value,
+        supplier_id: document.getElementById('globalProdSupplier').value,
+        purchase_price: document.getElementById('globalProdPurchasePrice').value,
+        selling_price: document.getElementById('globalProdSellingPrice').value,
+        quantity: document.getElementById('globalProdQuantity').value,
+        minimum_stock: document.getElementById('globalProdMinStock').value,
+        description: document.getElementById('globalProdDesc').value
+      };
+
+      try {
+        const res = await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          bootstrap.Modal.getInstance(quickAddModalEl).hide();
+          form.reset();
+          showToast(data.message, 'success');
+          // Reload page or list if on products/dashboard page
+          setTimeout(() => { window.location.reload(); }, 600);
+        } else {
+          showToast(data.error || 'Failed to create product', 'danger');
+        }
+      } catch (err) {
+        showToast('Network error creating product', 'danger');
+      }
+    });
+  }
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+
+{% block title %}Supplier Management - Smart Inventory System{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Supplier Directory</h1>
+    <p class="page-subtitle">Manage approved inventory vendors, contact profiles, and product sourcing relationships.</p>
+  </div>
+  <div class="header-action-group">
+    <button class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#addSupplierModal">
+      <i class="bi bi-person-plus-fill"></i> Add New Supplier
+    </button>
+  </div>
+</div>
+
+<!-- Search Bar Card -->
+<div class="card-custom mb-4">
+  <div class="card-custom-body">
+    <div class="row g-3 align-items-center">
+      <div class="col-md-6">
+        <div class="position-relative">
+          <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+          <input type="text" class="form-control form-control-custom ps-5" id="supplierSearchInput" placeholder="Search suppliers by name, company, contact, or email...">
+        </div>
+      </div>
+      <div class="col-md-6 text-md-end text-muted small">
+        <span id="supplierTotalCount">Loading suppliers...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Suppliers Table Card -->
+<div class="card-custom">
+  <div class="card-custom-header">
+    <h3 class="card-custom-title"><i class="bi bi-truck text-secondary"></i> Registered Suppliers</h3>
+  </div>
+
+  <div id="suppliersEmptyState" class="empty-state d-none">
+    <div class="empty-state-icon"><i class="bi bi-person-x"></i></div>
+    <div class="empty-state-title">No Suppliers Found</div>
+    <p class="empty-state-text">No supplier records match your search criteria.</p>
+    <button class="btn btn-outline-custom" onclick="document.getElementById('supplierSearchInput').value=''; loadSuppliers();">Reset Search</button>
+  </div>
+
+  <div class="table-custom-wrapper border-0" id="suppliersTableWrapper">
+    <table class="table-custom">
+      <thead>
+        <tr>
+          <th>Supplier Name</th>
+          <th>Company / Entity</th>
+          <th>Contact Person</th>
+          <th>Phone Number</th>
+          <th>Email Address</th>
+          <th>Products Sourced</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="suppliersTableBody">
+        <!-- Rendered via JS -->
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- MODAL: ADD SUPPLIER                                                    -->
+<!-- ====================================================================== -->
+<div class="modal fade" id="addSupplierModal" tabindex="-1" aria-labelledby="addSupplierModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form id="addSupplierForm">
+        <div class="modal-header">
+          <h5 class="modal-title" id="addSupplierModalLabel">
+            <i class="bi bi-truck text-secondary"></i> Register New Supplier
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Supplier Name / Trade Name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-custom" id="addSuppName" placeholder="e.g. Pacific Tech Wholesale" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Company Registered Name</label>
+              <input type="text" class="form-control form-control-custom" id="addSuppCompany" placeholder="e.g. Pacific Technologies LLC">
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Contact Person</label>
+              <input type="text" class="form-control form-control-custom" id="addSuppContact" placeholder="e.g. Sarah Jenkins">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Phone Number</label>
+              <input type="text" class="form-control form-control-custom" id="addSuppPhone" placeholder="+1 (555) 000-0000">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Email Address</label>
+              <input type="email" class="form-control form-control-custom" id="addSuppEmail" placeholder="vendor@example.com">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Physical / Warehouse Address</label>
+              <input type="text" class="form-control form-control-custom" id="addSuppAddress" placeholder="e.g. 100 Industrial Road, Suite 400, Chicago, IL">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Sourcing Scope & Notes</label>
+              <textarea class="form-control form-control-custom" id="addSuppNotes" rows="2" placeholder="Supply categories, lead times, payment terms..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-secondary-custom">
+            <i class="bi bi-check-lg"></i> Register Supplier
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- MODAL: EDIT SUPPLIER                                                   -->
+<!-- ====================================================================== -->
+<div class="modal fade" id="editSupplierModal" tabindex="-1" aria-labelledby="editSupplierModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form id="editSupplierForm">
+        <input type="hidden" id="editSuppId">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editSupplierModalLabel">
+            <i class="bi bi-pencil-square text-secondary"></i> Edit Supplier Profile
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Supplier Name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-custom" id="editSuppName" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Company Name</label>
+              <input type="text" class="form-control form-control-custom" id="editSuppCompany">
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Contact Person</label>
+              <input type="text" class="form-control form-control-custom" id="editSuppContact">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Phone Number</label>
+              <input type="text" class="form-control form-control-custom" id="editSuppPhone">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Email Address</label>
+              <input type="email" class="form-control form-control-custom" id="editSuppEmail">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Address</label>
+              <input type="text" class="form-control form-control-custom" id="editSuppAddress">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Notes</label>
+              <textarea class="form-control form-control-custom" id="editSuppNotes" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-secondary-custom">
+            <i class="bi bi-check-lg"></i> Update Supplier
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- MODAL: VIEW SUPPLIER DETAILS & PRODUCTS                                -->
+<!-- ====================================================================== -->
+<div class="modal fade" id="viewSupplierModal" tabindex="-1" aria-labelledby="viewSupplierModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="viewSupplierModalLabel">
+          <i class="bi bi-building text-secondary"></i> Supplier Profile & Associated Catalog
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3 mb-3" id="viewSuppDetailsRow">
+          <!-- Populated by JS -->
+        </div>
+
+        <h6 class="fw-bold mt-4 mb-2"><i class="bi bi-boxes text-secondary me-1"></i> Products Supplied by this Vendor</h6>
+        <div class="table-custom-wrapper border-0">
+          <table class="table-custom">
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Product Name</th>
+                <th>Category</th>
+                <th>In Stock</th>
+                <th>Purchase Cost</th>
+              </tr>
+            </thead>
+            <tbody id="viewSuppProductsBody">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let suppliersCache = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadSuppliers();
+
+  document.getElementById('supplierSearchInput').addEventListener('input', debounce(loadSuppliers, 250));
+
+  // Add Supplier Form
+  document.getElementById('addSupplierForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      supplier_name: document.getElementById('addSuppName').value,
+      company_name: document.getElementById('addSuppCompany').value,
+      contact_person: document.getElementById('addSuppContact').value,
+      phone: document.getElementById('addSuppPhone').value,
+      email: document.getElementById('addSuppEmail').value,
+      address: document.getElementById('addSuppAddress').value,
+      notes: document.getElementById('addSuppNotes').value
+    };
+
+    try {
+      const res = await fetch('/api/suppliers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        bootstrap.Modal.getInstance(document.getElementById('addSupplierModal')).hide();
+        document.getElementById('addSupplierForm').reset();
+        showToast(data.message, 'success');
+        loadSuppliers();
+      } else {
+        showToast(data.error || 'Failed to add supplier', 'danger');
+      }
+    } catch (err) {
+      showToast('Network error creating supplier', 'danger');
+    }
+  });
+
+  // Edit Supplier Form
+  document.getElementById('editSupplierForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('editSuppId').value;
+    const payload = {
+      supplier_name: document.getElementById('editSuppName').value,
+      company_name: document.getElementById('editSuppCompany').value,
+      contact_person: document.getElementById('editSuppContact').value,
+      phone: document.getElementById('editSuppPhone').value,
+      email: document.getElementById('editSuppEmail').value,
+      address: document.getElementById('editSuppAddress').value,
+      notes: document.getElementById('editSuppNotes').value
+    };
+
+    try {
+      const res = await fetch(`/api/suppliers/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        bootstrap.Modal.getInstance(document.getElementById('editSupplierModal')).hide();
+        showToast(data.message, 'success');
+        loadSuppliers();
+      } else {
+        showToast(data.error || 'Failed to update supplier', 'danger');
+      }
+    } catch (err) {
+      showToast('Network error updating supplier', 'danger');
+    }
+  });
+});
+
+async function loadSuppliers() {
+  const search = document.getElementById('supplierSearchInput').value.trim();
+  try {
+    const res = await fetch(`/api/suppliers?search=${encodeURIComponent(search)}`);
+    const data = await res.json();
+    if (!data.success) return;
+
+    suppliersCache = data.suppliers;
+    renderSuppliersTable(suppliersCache);
+    document.getElementById('supplierTotalCount').textContent = `Showing ${data.count} registered supplier(s)`;
+  } catch (err) {
+    console.error('Failed to load suppliers:', err);
+  }
+}
+
+function renderSuppliersTable(suppliers) {
+  const tbody = document.getElementById('suppliersTableBody');
+  const emptyState = document.getElementById('suppliersEmptyState');
+  const wrapper = document.getElementById('suppliersTableWrapper');
+
+  if (!suppliers || suppliers.length === 0) {
+    emptyState.classList.remove('d-none');
+    wrapper.classList.add('d-none');
+    return;
+  }
+
+  emptyState.classList.add('d-none');
+  wrapper.classList.remove('d-none');
+
+  let html = '';
+  suppliers.forEach(s => {
+    html += `
+      <tr>
+        <td>
+          <div class="fw-bold text-main">${escapeHtml(s.supplier_name)}</div>
+          <div class="text-muted small">${escapeHtml(s.address || 'Address unlisted')}</div>
+        </td>
+        <td>
+          <span class="fw-medium">${escapeHtml(s.company_name || '-')}</span>
+        </td>
+        <td>
+          <span class="small">${escapeHtml(s.contact_person || '-')}</span>
+        </td>
+        <td>
+          <span class="small font-monospace">${escapeHtml(s.phone || '-')}</span>
+        </td>
+        <td>
+          ${s.email ? `<a href="mailto:${escapeHtml(s.email)}" class="small text-secondary">${escapeHtml(s.email)}</a>` : '<span class="text-muted small">-</span>'}
+        </td>
+        <td>
+          <span class="badge bg-secondary-subtle text-secondary">${s.product_count} Product(s)</span>
+        </td>
+        <td class="text-end">
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-custom p-1 px-2" onclick="openViewSupplier(${s.id})" title="View Details">
+              <i class="bi bi-eye text-primary"></i>
+            </button>
+            <button class="btn btn-outline-custom p-1 px-2" onclick="openEditSupplier(${s.id})" title="Edit Supplier">
+              <i class="bi bi-pencil-square text-secondary"></i>
+            </button>
+            <button class="btn btn-outline-custom p-1 px-2 text-danger" onclick="deleteSupplier(${s.id}, '${escapeHtml(s.supplier_name)}', ${s.product_count})" title="Delete Supplier">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+function openEditSupplier(id) {
+  const s = suppliersCache.find(x => x.id === id);
+  if (!s) return;
+
+  document.getElementById('editSuppId').value = s.id;
+  document.getElementById('editSuppName').value = s.supplier_name;
+  document.getElementById('editSuppCompany').value = s.company_name;
+  document.getElementById('editSuppContact').value = s.contact_person;
+  document.getElementById('editSuppPhone').value = s.phone;
+  document.getElementById('editSuppEmail').value = s.email;
+  document.getElementById('editSuppAddress').value = s.address;
+  document.getElementById('editSuppNotes').value = s.notes;
+
+  const modal = new bootstrap.Modal(document.getElementById('editSupplierModal'));
+  modal.show();
+}
+
+async function openViewSupplier(id) {
+  try {
+    const res = await fetch(`/api/suppliers/${id}`);
+    const data = await res.json();
+    if (!data.success) return;
+
+    const s = data.supplier;
+    const prods = data.products;
+
+    document.getElementById('viewSuppDetailsRow').innerHTML = `
+      <div class="col-md-6">
+        <span class="text-muted small d-block">Supplier Trade Name</span>
+        <span class="fw-bold fs-6">${escapeHtml(s.supplier_name)}</span>
+      </div>
+      <div class="col-md-6">
+        <span class="text-muted small d-block">Company Legal Name</span>
+        <span class="fw-semibold">${escapeHtml(s.company_name || 'N/A')}</span>
+      </div>
+      <div class="col-md-4">
+        <span class="text-muted small d-block">Contact Representative</span>
+        <span>${escapeHtml(s.contact_person || 'N/A')}</span>
+      </div>
+      <div class="col-md-4">
+        <span class="text-muted small d-block">Phone</span>
+        <span class="font-monospace">${escapeHtml(s.phone || 'N/A')}</span>
+      </div>
+      <div class="col-md-4">
+        <span class="text-muted small d-block">Email</span>
+        <span>${escapeHtml(s.email || 'N/A')}</span>
+      </div>
+      <div class="col-12">
+        <span class="text-muted small d-block">Warehouse Location</span>
+        <span class="small">${escapeHtml(s.address || 'N/A')}</span>
+      </div>
+    `;
+
+    const tbody = document.getElementById('viewSuppProductsBody');
+    if (!prods || prods.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted small p-3">No active products currently linked to this supplier.</td></tr>`;
+    } else {
+      let html = '';
+      prods.forEach(p => {
+        html += `
+          <tr>
+            <td><span class="font-monospace small badge bg-light text-dark border">${escapeHtml(p.sku)}</span></td>
+            <td class="fw-semibold"><a href="/products/${p.id}">${escapeHtml(p.name)}</a></td>
+            <td><span class="badge bg-secondary-subtle text-secondary">${escapeHtml(p.category)}</span></td>
+            <td class="fw-bold">${p.quantity} ${escapeHtml(p.unit)}</td>
+            <td>${p.purchase_price.toFixed(2)}</td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('viewSupplierModal'));
+    modal.show();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function deleteSupplier(id, name, prodCount) {
+  if (prodCount > 0) {
+    showToast(`Protected: Cannot delete supplier '${name}' because it supplies ${prodCount} product(s). Please reassign or update those products first.`, 'warning');
+    return;
+  }
+
+  if (!confirm(`Are you sure you want to remove supplier '${name}'? This action cannot be undone.`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/suppliers/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message, 'success');
+      loadSuppliers();
+    } else {
+      showToast(data.error || 'Failed to delete supplier', 'danger');
+    }
+  } catch (err) {
+    showToast('Network error deleting supplier', 'danger');
+  }
+}
+
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,453 @@
+{% extends "base.html" %}
+
+{% block title %}Products Management - Smart Inventory System{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Products Inventory</h1>
+    <p class="page-subtitle">Add, edit, track quantities, and maintain catalog inventory levels.</p>
+  </div>
+  <div class="header-action-group">
+    <a href="{{ url_for('export_products_csv') }}" class="btn btn-outline-custom">
+      <i class="bi bi-download"></i> Export CSV
+    </a>
+    <button class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#quickAddProductModal">
+      <i class="bi bi-plus-lg"></i> Add New Product
+    </button>
+  </div>
+</div>
+
+<!-- Filter and Search Toolbar -->
+<div class="card-custom mb-4">
+  <div class="card-custom-body">
+    <div class="row g-3 align-items-center">
+      <div class="col-lg-4 col-md-6">
+        <div class="position-relative">
+          <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+          <input type="text" class="form-control form-control-custom ps-5" id="productSearchInput" placeholder="Search by name, SKU, or description...">
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <select class="form-select form-select-custom" id="categoryFilter">
+          <option value="">All Categories</option>
+        </select>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <select class="form-select form-select-custom" id="statusFilter">
+          <option value="">All Stock Statuses</option>
+          <option value="in_stock">In Stock (> Threshold)</option>
+          <option value="low_stock">Low Stock (≤ Threshold)</option>
+          <option value="out_of_stock">Out of Stock (= 0)</option>
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <select class="form-select form-select-custom" id="sortBySelect">
+          <option value="name_asc">Sort: Name (A-Z)</option>
+          <option value="name_desc">Sort: Name (Z-A)</option>
+          <option value="quantity_asc">Sort: Stock (Low-High)</option>
+          <option value="quantity_desc">Sort: Stock (High-Low)</option>
+          <option value="purchase_price_desc">Sort: Price (High-Low)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Products Table Card -->
+<div class="card-custom">
+  <div class="card-custom-header">
+    <div class="d-flex align-items-center gap-2">
+      <h3 class="card-custom-title"><i class="bi bi-boxes text-secondary"></i> Catalog Items</h3>
+      <span class="badge bg-secondary-subtle text-secondary small" id="productCountBadge">0 Products</span>
+    </div>
+  </div>
+
+  <div id="productsEmptyState" class="empty-state d-none">
+    <div class="empty-state-icon"><i class="bi bi-search"></i></div>
+    <div class="empty-state-title">No Products Found</div>
+    <p class="empty-state-text">No inventory items matched your selected filters.</p>
+    <button class="btn btn-outline-custom" id="clearFiltersBtn">Clear Filters</button>
+  </div>
+
+  <div class="table-custom-wrapper border-0" id="productsTableWrapper">
+    <table class="table-custom">
+      <thead>
+        <tr>
+          <th>SKU / Code</th>
+          <th>Product Name</th>
+          <th>Category</th>
+          <th>Supplier</th>
+          <th>Current Stock</th>
+          <th>Cost Price</th>
+          <th>Retail Price</th>
+          <th>Stock Status</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="productsTableBody">
+        <!-- Loaded via JavaScript -->
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- MODAL: EDIT PRODUCT                                                    -->
+<!-- ====================================================================== -->
+<div class="modal fade" id="editProductModal" tabindex="-1" aria-labelledby="editProductModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form id="editProductForm">
+        <input type="hidden" id="editProductId">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editProductModalLabel">
+            <i class="bi bi-pencil-square text-secondary"></i> Edit Product Information
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Product Name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-custom" id="editProdName" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Product SKU <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-custom" id="editProdSku" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Category <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-custom" id="editProdCategory" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Unit of Measurement</label>
+              <input type="text" class="form-control form-control-custom" id="editProdUnit" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Supplier</label>
+              <select class="form-select form-select-custom" id="editProdSupplier">
+                <option value="">-- None --</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Purchase Price ({{ currency_symbol }})</label>
+              <input type="number" step="0.01" min="0" class="form-control form-control-custom" id="editProdPurchasePrice" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Selling Price ({{ currency_symbol }})</label>
+              <input type="number" step="0.01" min="0" class="form-control form-control-custom" id="editProdSellingPrice" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Low-Stock Alert Threshold</label>
+              <input type="number" min="0" class="form-control form-control-custom" id="editProdMinStock" required>
+              <div class="form-text" style="font-size: 0.75rem;">Alert triggered when stock falls at or below this value.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Current Stock (Read-only)</label>
+              <input type="text" class="form-control form-control-custom bg-light" id="editProdCurrentStock" readonly>
+              <div class="form-text" style="font-size: 0.75rem;">To adjust stock, use the Stock Operations module.</div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Description</label>
+              <textarea class="form-control form-control-custom" id="editProdDesc" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-secondary-custom">
+            <i class="bi bi-check-lg"></i> Update Product
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- MODAL: DELETE PRODUCT CONFIRMATION                                     -->
+<!-- ====================================================================== -->
+<div class="modal fade" id="deleteProductModal" tabindex="-1" aria-labelledby="deleteProductModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-danger" id="deleteProductModalLabel">
+          <i class="bi bi-trash3-fill"></i> Delete Product Confirmation
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to remove <strong id="deleteProdNameDisplay" class="text-danger"></strong> (<span id="deleteProdSkuDisplay" class="font-monospace"></span>) from active inventory?</p>
+        <div class="alert alert-info small py-2 mb-0">
+          <i class="bi bi-info-circle-fill me-1"></i> <strong>Audit Integrity Protected:</strong> Existing transaction records associated with this product will remain completely preserved in the transaction history.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteProdBtn">
+          <i class="bi bi-trash3"></i> Yes, Delete Product
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentProducts = [];
+let deleteTargetId = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadProducts();
+  loadSupplierOptions();
+
+  // Bind filter events
+  document.getElementById('productSearchInput').addEventListener('input', debounce(loadProducts, 250));
+  document.getElementById('categoryFilter').addEventListener('change', loadProducts);
+  document.getElementById('statusFilter').addEventListener('change', loadProducts);
+  document.getElementById('sortBySelect').addEventListener('change', loadProducts);
+
+  document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+    document.getElementById('productSearchInput').value = '';
+    document.getElementById('categoryFilter').value = '';
+    document.getElementById('statusFilter').value = '';
+    document.getElementById('sortBySelect').value = 'name_asc';
+    loadProducts();
+  });
+
+  // Edit form submit
+  document.getElementById('editProductForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('editProductId').value;
+    const payload = {
+      name: document.getElementById('editProdName').value,
+      sku: document.getElementById('editProdSku').value,
+      category: document.getElementById('editProdCategory').value,
+      unit: document.getElementById('editProdUnit').value,
+      supplier_id: document.getElementById('editProdSupplier').value,
+      purchase_price: document.getElementById('editProdPurchasePrice').value,
+      selling_price: document.getElementById('editProdSellingPrice').value,
+      minimum_stock: document.getElementById('editProdMinStock').value,
+      description: document.getElementById('editProdDesc').value
+    };
+
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        bootstrap.Modal.getInstance(document.getElementById('editProductModal')).hide();
+        showToast(data.message, 'success');
+        loadProducts();
+      } else {
+        showToast(data.error || 'Update failed', 'danger');
+      }
+    } catch (err) {
+      showToast('Error updating product', 'danger');
+    }
+  });
+
+  // Delete confirm action
+  document.getElementById('confirmDeleteProdBtn').addEventListener('click', async () => {
+    if (!deleteTargetId) return;
+    try {
+      const res = await fetch(`/api/products/${deleteTargetId}`, { method: 'DELETE' });
+      const data = await res.json();
+      bootstrap.Modal.getInstance(document.getElementById('deleteProductModal')).hide();
+      if (data.success) {
+        showToast(data.message, 'success');
+        loadProducts();
+        initAlertsDropdown();
+      } else {
+        showToast(data.error || 'Failed to delete product', 'danger');
+      }
+    } catch (err) {
+      showToast('Error deleting product', 'danger');
+    }
+  });
+});
+
+async function loadProducts() {
+  const search = document.getElementById('productSearchInput').value.trim();
+  const category = document.getElementById('categoryFilter').value;
+  const status = document.getElementById('statusFilter').value;
+  const sortVal = document.getElementById('sortBySelect').value;
+
+  const [sortBy, order] = sortVal.split('_');
+
+  let url = `/api/products?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}&status=${encodeURIComponent(status)}&sort_by=${sortBy}&order=${order}`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!data.success) return;
+    currentProducts = data.products;
+
+    renderProductsTable(currentProducts);
+    updateCategoryDropdown(currentProducts);
+    document.getElementById('productCountBadge').textContent = `${data.count} Products`;
+  } catch (err) {
+    console.error('Failed to load products:', err);
+  }
+}
+
+function renderProductsTable(products) {
+  const tbody = document.getElementById('productsTableBody');
+  const emptyState = document.getElementById('productsEmptyState');
+  const wrapper = document.getElementById('productsTableWrapper');
+
+  if (!products || products.length === 0) {
+    emptyState.classList.remove('d-none');
+    wrapper.classList.add('d-none');
+    return;
+  }
+
+  emptyState.classList.add('d-none');
+  wrapper.classList.remove('d-none');
+
+  let html = '';
+  products.forEach(p => {
+    const badgeClass = p.status_badge === 'danger' ? 'badge-status-danger' :
+                      p.status_badge === 'warning' ? 'badge-status-warning' : 'badge-status-success';
+
+    html += `
+      <tr>
+        <td>
+          <span class="badge bg-light text-dark font-monospace border">${escapeHtml(p.sku)}</span>
+        </td>
+        <td>
+          <a href="/products/${p.id}" class="fw-bold text-decoration-none d-block text-truncate" style="max-width: 240px;">
+            ${escapeHtml(p.name)}
+          </a>
+          <span class="text-muted small text-truncate d-inline-block" style="max-width: 240px;">${escapeHtml(p.description || 'No description')}</span>
+        </td>
+        <td>
+          <span class="badge bg-secondary-subtle text-secondary">${escapeHtml(p.category)}</span>
+        </td>
+        <td>
+          <span class="small">${escapeHtml(p.supplier_name)}</span>
+        </td>
+        <td>
+          <span class="fw-bold fs-6">${p.quantity}</span>
+          <span class="small text-muted">${escapeHtml(p.unit)}</span>
+          <div class="text-muted" style="font-size: 0.72rem;">Min: ${p.minimum_stock}</div>
+        </td>
+        <td>${p.purchase_price.toFixed(2)}</td>
+        <td>${p.selling_price.toFixed(2)}</td>
+        <td>
+          <span class="badge-status ${badgeClass}">
+            ${escapeHtml(p.stock_status)}
+          </span>
+        </td>
+        <td class="text-end">
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-custom p-1 px-2" type="button" data-bs-toggle="dropdown">
+              <i class="bi bi-three-dots-vertical"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+              <li>
+                <a class="dropdown-item small" href="/products/${p.id}">
+                  <i class="bi bi-eye text-primary me-2"></i> View Details
+                </a>
+              </li>
+              <li>
+                <button class="dropdown-item small" onclick="openEditProduct(${p.id})">
+                  <i class="bi bi-pencil-square text-secondary me-2"></i> Edit Product
+                </button>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <button class="dropdown-item small text-danger" onclick="openDeleteProduct(${p.id}, '${escapeHtml(p.name)}', '${escapeHtml(p.sku)}')">
+                  <i class="bi bi-trash3 text-danger me-2"></i> Delete Product
+                </button>
+              </li>
+            </ul>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+}
+
+function updateCategoryDropdown(products) {
+  const catSelect = document.getElementById('categoryFilter');
+  const currentVal = catSelect.value;
+  const categories = new Set();
+  products.forEach(p => { if (p.category) categories.add(p.category); });
+
+  let html = '<option value="">All Categories</option>';
+  categories.forEach(cat => {
+    html += `<option value="${escapeHtml(cat)}" ${cat === currentVal ? 'selected' : ''}>${escapeHtml(cat)}</option>`;
+  });
+  // Only update if currently has 1 option
+  if (catSelect.options.length <= 1) {
+    catSelect.innerHTML = html;
+  }
+}
+
+async function loadSupplierOptions() {
+  const editSelect = document.getElementById('editProdSupplier');
+  try {
+    const res = await fetch('/api/suppliers');
+    const data = await res.json();
+    if (data.success) {
+      let html = '<option value="">-- None --</option>';
+      data.suppliers.forEach(s => {
+        html += `<option value="${s.id}">${escapeHtml(s.supplier_name)}</option>`;
+      });
+      editSelect.innerHTML = html;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function openEditProduct(productId) {
+  const p = currentProducts.find(item => item.id === productId);
+  if (!p) return;
+
+  document.getElementById('editProductId').value = p.id;
+  document.getElementById('editProdName').value = p.name;
+  document.getElementById('editProdSku').value = p.sku;
+  document.getElementById('editProdCategory').value = p.category;
+  document.getElementById('editProdUnit').value = p.unit;
+  document.getElementById('editProdSupplier').value = p.supplier_id || '';
+  document.getElementById('editProdPurchasePrice').value = p.purchase_price;
+  document.getElementById('editProdSellingPrice').value = p.selling_price;
+  document.getElementById('editProdMinStock').value = p.minimum_stock;
+  document.getElementById('editProdCurrentStock').value = `${p.quantity} ${p.unit}`;
+  document.getElementById('editProdDesc').value = p.description || '';
+
+  const modal = new bootstrap.Modal(document.getElementById('editProductModal'));
+  modal.show();
+}
+
+function openDeleteProduct(id, name, sku) {
+  deleteTargetId = id;
+  document.getElementById('deleteProdNameDisplay').textContent = name;
+  document.getElementById('deleteProdSkuDisplay').textContent = sku;
+  const modal = new bootstrap.Modal(document.getElementById('deleteProductModal'));
+  modal.show();
+}
+
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
+</script>
+{% endblock %}

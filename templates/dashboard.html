@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Smart Inventory Management System{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Inventory Dashboard</h1>
+    <p class="page-subtitle">Real-time inventory valuation, stock movements, and low-level replenishments.</p>
+  </div>
+  <div class="header-action-group">
+    <button class="btn btn-outline-custom" data-bs-toggle="modal" data-bs-target="#quickStockInModal">
+      <i class="bi bi-box-arrow-in-down text-success"></i> Stock In
+    </button>
+    <button class="btn btn-outline-custom" data-bs-toggle="modal" data-bs-target="#quickStockOutModal">
+      <i class="bi bi-box-arrow-up text-danger"></i> Stock Out
+    </button>
+    <button class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#quickAddProductModal">
+      <i class="bi bi-plus-lg"></i> Add Product
+    </button>
+  </div>
+</div>
+
+<!-- Low Stock Warning Banner -->
+<div class="alert alert-warning alert-dismissible fade show d-none align-items-center shadow-sm border-0 mb-4" id="dashboardAlertBanner" role="alert">
+  <div class="d-flex align-items-center gap-3">
+    <i class="bi bi-exclamation-triangle-fill fs-3 text-warning"></i>
+    <div>
+      <div class="fw-bold" id="alertBannerText">Attention: Inventory items need immediate replenishment!</div>
+      <div class="small">Items at or below minimum threshold can cause fulfillment disruptions.</div>
+    </div>
+  </div>
+  <div class="ms-auto">
+    <a href="{{ url_for('alerts_page') }}" class="btn btn-sm btn-warning fw-bold me-2">Review Alerts</a>
+    <button type="button" class="btn-close position-relative p-2" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- 1. SUMMARY METRIC CARDS                                                -->
+<!-- ====================================================================== -->
+<div class="row g-3 mb-4">
+  <!-- Card 1: Total Products -->
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="stat-card">
+      <div class="stat-info">
+        <span class="stat-label">Total Products</span>
+        <span class="stat-value" id="statTotalProducts">-</span>
+        <span class="stat-meta text-muted"><i class="bi bi-tag-fill me-1"></i> Catalog SKUs</span>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-blue">
+        <i class="bi bi-boxes"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2: Units in Stock -->
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="stat-card">
+      <div class="stat-info">
+        <span class="stat-label">Stock Units</span>
+        <span class="stat-value" id="statTotalUnits">-</span>
+        <span class="stat-meta text-success"><i class="bi bi-archive-fill me-1"></i> Physical Units</span>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-green">
+        <i class="bi bi-layers-fill"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3: Low Stock Items -->
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="stat-card">
+      <div class="stat-info">
+        <span class="stat-label">Low Stock</span>
+        <span class="stat-value text-warning" id="statLowStock">-</span>
+        <span class="stat-meta text-warning"><i class="bi bi-exclamation-circle-fill me-1"></i> Below Min</span>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-amber">
+        <i class="bi bi-exclamation-triangle"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 4: Out of Stock Items -->
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="stat-card">
+      <div class="stat-info">
+        <span class="stat-label">Out of Stock</span>
+        <span class="stat-value text-danger" id="statOutOfStock">-</span>
+        <span class="stat-meta text-danger"><i class="bi bi-x-octagon-fill me-1"></i> Zero Units</span>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-red">
+        <i class="bi bi-dash-circle-dotted"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 5: Total Suppliers -->
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="stat-card">
+      <div class="stat-info">
+        <span class="stat-label">Suppliers</span>
+        <span class="stat-value" id="statTotalSuppliers">-</span>
+        <span class="stat-meta text-muted"><i class="bi bi-building me-1"></i> Active Vendors</span>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-navy">
+        <i class="bi bi-truck"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 6: Total Inventory Value -->
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="stat-card">
+      <div class="stat-info">
+        <span class="stat-label">Inventory Value</span>
+        <span class="stat-value text-primary" id="statInventoryValue">-</span>
+        <span class="stat-meta text-muted"><i class="bi bi-calculator me-1"></i> Purchase Cost</span>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-purple">
+        <i class="bi bi-cash-stack"></i>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- 2. DATA VISUALIZATION CHARTS                                           -->
+<!-- ====================================================================== -->
+<div class="row g-4 mb-4">
+  <!-- Chart 1: Stock Distribution by Category -->
+  <div class="col-lg-6">
+    <div class="card-custom h-100">
+      <div class="card-custom-header">
+        <h3 class="card-custom-title">
+          <i class="bi bi-pie-chart text-secondary"></i> Stock Distribution by Category
+        </h3>
+        <span class="badge bg-secondary-subtle text-secondary small">Volume Split</span>
+      </div>
+      <div class="card-custom-body position-relative" style="min-height: 280px;">
+        <canvas id="categoryChart" style="max-height: 280px;"></canvas>
+        <div id="catChartEmpty" class="empty-state d-none py-4">
+          <div class="empty-state-icon"><i class="bi bi-pie-chart"></i></div>
+          <div class="empty-state-title">No Category Data</div>
+          <p class="empty-state-text">Add products to see category breakdown.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart 2: Top Products by Quantity -->
+  <div class="col-lg-6">
+    <div class="card-custom h-100">
+      <div class="card-custom-header">
+        <h3 class="card-custom-title">
+          <i class="bi bi-bar-chart-steps text-secondary"></i> Top Products by Quantity
+        </h3>
+        <span class="badge bg-secondary-subtle text-secondary small">Highest Stock</span>
+      </div>
+      <div class="card-custom-body position-relative" style="min-height: 280px;">
+        <canvas id="topProductsChart" style="max-height: 280px;"></canvas>
+        <div id="topChartEmpty" class="empty-state d-none py-4">
+          <div class="empty-state-icon"><i class="bi bi-bar-chart"></i></div>
+          <div class="empty-state-title">No Product Data</div>
+          <p class="empty-state-text">Add products to view highest stocked items.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart 3: Monthly Stock-In vs Stock-Out -->
+  <div class="col-lg-8">
+    <div class="card-custom h-100">
+      <div class="card-custom-header">
+        <h3 class="card-custom-title">
+          <i class="bi bi-graph-up-arrow text-secondary"></i> Stock Movement Activity (In vs Out)
+        </h3>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-success-subtle text-success small"><i class="bi bi-arrow-down"></i> Received</span>
+          <span class="badge bg-danger-subtle text-danger small"><i class="bi bi-arrow-up"></i> Dispatched</span>
+        </div>
+      </div>
+      <div class="card-custom-body" style="min-height: 280px;">
+        <canvas id="timelineChart" style="max-height: 280px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart 4: Stock Health Status -->
+  <div class="col-lg-4">
+    <div class="card-custom h-100">
+      <div class="card-custom-header">
+        <h3 class="card-custom-title">
+          <i class="bi bi-shield-check text-secondary"></i> Inventory Health Status
+        </h3>
+        <span class="badge bg-secondary-subtle text-secondary small">Health Ratio</span>
+      </div>
+      <div class="card-custom-body" style="min-height: 280px;">
+        <canvas id="statusChart" style="max-height: 280px;"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- 3. RECENT ACTIVITY TABLE & QUICK ACTIONS                               -->
+<!-- ====================================================================== -->
+<div class="card-custom mb-4">
+  <div class="card-custom-header">
+    <h3 class="card-custom-title">
+      <i class="bi bi-clock-history text-secondary"></i> Recent Inventory Transactions
+    </h3>
+    <div class="d-flex align-items-center gap-2">
+      <a href="{{ url_for('transactions_page') }}" class="btn btn-sm btn-outline-custom">
+        <span>View Full Audit Log</span> <i class="bi bi-arrow-right"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- Empty State when no transactions exist -->
+  <div id="recentActivityEmpty" class="empty-state d-none">
+    <div class="empty-state-icon"><i class="bi bi-inbox"></i></div>
+    <div class="empty-state-title">No Inventory Transactions Yet</div>
+    <p class="empty-state-text">Start by receiving stock or adding inventory items.</p>
+    <button class="btn btn-secondary-custom" data-bs-toggle="modal" data-bs-target="#quickAddProductModal">
+      <i class="bi bi-plus-lg"></i> Add First Product
+    </button>
+  </div>
+
+  <!-- Activity Table -->
+  <div id="recentActivityWrapper" class="table-custom-wrapper border-0">
+    <table class="table-custom">
+      <thead>
+        <tr>
+          <th>Date & Reference</th>
+          <th>Product / SKU</th>
+          <th>Transaction Type</th>
+          <th>Quantity Changed</th>
+          <th>Previous Stock</th>
+          <th>Updated Stock</th>
+        </tr>
+      </thead>
+      <tbody id="recentActivityBody">
+        <!-- Rendered dynamically by static/js/dashboard.js -->
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Quick Navigation Strip -->
+<div class="row g-3">
+  <div class="col-md-3 col-6">
+    <a href="{{ url_for('products_page') }}" class="card-custom p-3 d-flex align-items-center gap-3 text-decoration-none">
+      <div class="stat-icon-wrapper stat-icon-blue"><i class="bi bi-boxes"></i></div>
+      <div>
+        <div class="fw-bold text-main">Manage Products</div>
+        <div class="text-muted small">Edit SKUs & pricing</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-3 col-6">
+    <a href="{{ url_for('stock_page') }}" class="card-custom p-3 d-flex align-items-center gap-3 text-decoration-none">
+      <div class="stat-icon-wrapper stat-icon-green"><i class="bi bi-arrow-left-right"></i></div>
+      <div>
+        <div class="fw-bold text-main">Stock Operations</div>
+        <div class="text-muted small">In, Out, Adjustments</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-3 col-6">
+    <a href="{{ url_for('suppliers_page') }}" class="card-custom p-3 d-flex align-items-center gap-3 text-decoration-none">
+      <div class="stat-icon-wrapper stat-icon-navy"><i class="bi bi-truck"></i></div>
+      <div>
+        <div class="fw-bold text-main">Manage Suppliers</div>
+        <div class="text-muted small">Vendor directory</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-3 col-6">
+    <a href="{{ url_for('reports_page') }}" class="card-custom p-3 d-flex align-items-center gap-3 text-decoration-none">
+      <div class="stat-icon-wrapper stat-icon-purple"><i class="bi bi-file-earmark-bar-graph"></i></div>
+      <div>
+        <div class="fw-bold text-main">View Reports</div>
+        <div class="text-muted small">Valuation & exports</div>
+      </div>
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Dashboard Specific Scripts -->
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

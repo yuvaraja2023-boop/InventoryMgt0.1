@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.name }} - Product Details{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <a href="{{ url_for('products_page') }}" class="btn btn-sm btn-outline-custom p-1 px-2">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <h1 class="page-title mb-0">{{ product.name }}</h1>
+      <span class="badge bg-light text-dark font-monospace border ms-2">{{ product.sku }}</span>
+    </div>
+    <p class="page-subtitle">Product specification, supplier relations, and historical audit ledger.</p>
+  </div>
+  <div class="header-action-group">
+    <button class="btn btn-outline-custom" onclick="openDirectStockIn({{ product.id }}, '{{ product.name|replace("'", "\\'") }}')">
+      <i class="bi bi-box-arrow-in-down text-success"></i> Stock In
+    </button>
+    <button class="btn btn-outline-custom" onclick="openDirectStockOut({{ product.id }}, '{{ product.name|replace("'", "\\'") }}', {{ product.quantity }})">
+      <i class="bi bi-box-arrow-up text-danger"></i> Stock Out
+    </button>
+  </div>
+</div>
+
+<!-- Key Product Specification Cards -->
+<div class="row g-3 mb-4">
+  <!-- Stock Status Card -->
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-info">
+        <span class="stat-label">Current Stock</span>
+        <span class="stat-value {% if product.quantity == 0 %}text-danger{% elif product.quantity <= product.minimum_stock %}text-warning{% else %}text-success{% endif %}">
+          {{ product.quantity }} <span class="fs-6 text-muted fw-normal">{{ product.unit }}</span>
+        </span>
+        <span class="stat-meta text-muted">Alert Threshold: {{ product.minimum_stock }} {{ product.unit }}</span>
+      </div>
+      <div class="stat-icon-wrapper {% if product.quantity == 0 %}stat-icon-red{% elif product.quantity <= product.minimum_stock %}stat-icon-amber{% else %}stat-icon-green{% endif %}">
+        <i class="bi bi-box-seam"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Financial Valuation Card -->
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-info">
+        <span class="stat-label">Stock Cost Value</span>
+        <span class="stat-value text-primary">
+          {{ currency_symbol }} {{ "%.2f"|format(product.quantity * product.purchase_price) }}
+        </span>
+        <span class="stat-meta text-muted">Purchase: {{ currency_symbol }} {{ "%.2f"|format(product.purchase_price) }} / unit</span>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-blue">
+        <i class="bi bi-cash-stack"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Selling Price Card -->
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-info">
+        <span class="stat-label">Selling Price</span>
+        <span class="stat-value">
+          {{ currency_symbol }} {{ "%.2f"|format(product.selling_price) }}
+        </span>
+        <span class="stat-meta text-success">
+          Margin: {{ currency_symbol }} {{ "%.2f"|format(product.selling_price - product.purchase_price) }}
+        </span>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-navy">
+        <i class="bi bi-tag"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supplier Card -->
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-info">
+        <span class="stat-label">Assigned Supplier</span>
+        <span class="stat-value fs-5 text-truncate d-block" style="max-width: 170px;">
+          {{ product.supplier_name or 'Unassigned' }}
+        </span>
+        <span class="stat-meta text-muted">{{ product.supplier_company or 'Direct Sourcing' }}</span>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-purple">
+        <i class="bi bi-truck"></i>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Details & Description Row -->
+<div class="row g-4 mb-4">
+  <div class="col-lg-8">
+    <div class="card-custom h-100">
+      <div class="card-custom-header">
+        <h3 class="card-custom-title"><i class="bi bi-card-text text-secondary"></i> Product Overview & Notes</h3>
+        <span class="badge bg-secondary-subtle text-secondary">{{ product.category }}</span>
+      </div>
+      <div class="card-custom-body">
+        <p class="text-main mb-3">{{ product.description or 'No detailed description recorded for this item.' }}</p>
+        <hr class="my-3">
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <span class="text-muted small d-block">SKU Identifier</span>
+            <span class="fw-semibold font-monospace">{{ product.sku }}</span>
+          </div>
+          <div class="col-sm-6">
+            <span class="text-muted small d-block">Category Hierarchy</span>
+            <span class="fw-semibold">{{ product.category }}</span>
+          </div>
+          <div class="col-sm-6">
+            <span class="text-muted small d-block">Initial Registration</span>
+            <span class="fw-semibold">{{ product.created_at }}</span>
+          </div>
+          <div class="col-sm-6">
+            <span class="text-muted small d-block">Last Modified</span>
+            <span class="fw-semibold">{{ product.updated_at }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card-custom h-100">
+      <div class="card-custom-header">
+        <h3 class="card-custom-title"><i class="bi bi-shield-check text-secondary"></i> Inventory Thresholds</h3>
+      </div>
+      <div class="card-custom-body">
+        <ul class="list-group list-group-flush small">
+          <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0">
+            <span>Minimum Alert Level:</span>
+            <span class="fw-bold">{{ product.minimum_stock }} {{ product.unit }}</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0">
+            <span>Unit of Measurement:</span>
+            <span class="fw-bold">{{ product.unit }}</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0">
+            <span>Stock Status:</span>
+            {% if product.quantity == 0 %}
+              <span class="badge-status badge-status-danger">Out of Stock</span>
+            {% elif product.quantity <= product.minimum_stock %}
+              <span class="badge-status badge-status-warning">Low Stock</span>
+            {% else %}
+              <span class="badge-status badge-status-success">In Stock</span>
+            {% endif %}
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Historical Transaction Ledger for this product -->
+<div class="card-custom">
+  <div class="card-custom-header">
+    <div class="d-flex align-items-center gap-2">
+      <h3 class="card-custom-title"><i class="bi bi-clock-history text-secondary"></i> Transaction Audit Ledger</h3>
+      <span class="badge bg-secondary-subtle text-secondary small">{{ transactions|length }} Records</span>
+    </div>
+  </div>
+
+  {% if transactions|length == 0 %}
+    <div class="empty-state py-4">
+      <div class="empty-state-icon"><i class="bi bi-clock-history"></i></div>
+      <div class="empty-state-title">No Transactions Recorded</div>
+      <p class="empty-state-text">Movements for this product will appear here.</p>
+    </div>
+  {% else %}
+    <div class="table-custom-wrapper border-0">
+      <table class="table-custom">
+        <thead>
+          <tr>
+            <th>Date & Time</th>
+            <th>Type</th>
+            <th>Quantity Changed</th>
+            <th>Previous Stock</th>
+            <th>Resulting Stock</th>
+            <th>Reference #</th>
+            <th>Reason / Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in transactions %}
+            <tr>
+              <td class="small fw-semibold">{{ t.created_at }}</td>
+              <td>
+                {% if t.transaction_type == 'Stock In' %}
+                  <span class="badge-status badge-status-success"><i class="bi bi-box-arrow-in-down"></i> Stock In</span>
+                {% elif t.transaction_type == 'Stock Out' %}
+                  <span class="badge-status badge-status-danger"><i class="bi bi-box-arrow-up"></i> Stock Out</span>
+                {% elif t.transaction_type == 'Opening Stock' %}
+                  <span class="badge-status badge-status-info"><i class="bi bi-plus-circle"></i> Opening</span>
+                {% else %}
+                  <span class="badge-status badge-status-warning"><i class="bi bi-sliders"></i> Adjustment</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="fw-bold {% if t.quantity_changed >= 0 %}text-success{% else %}text-danger{% endif %}">
+                  {% if t.quantity_changed > 0 %}+{% endif %}{{ t.quantity_changed }}
+                </span>
+              </td>
+              <td>{{ t.previous_quantity }} {{ product.unit }}</td>
+              <td class="fw-bold">{{ t.new_quantity }} {{ product.unit }}</td>
+              <td><span class="font-monospace small">{{ t.reference_number or '-' }}</span></td>
+              <td class="small text-muted">{{ t.reason or '-' }} {% if t.notes %}&bull; {{ t.notes }}{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openDirectStockIn(pId, name) {
+  const modalEl = document.getElementById('quickStockInModal');
+  const modal = new bootstrap.Modal(modalEl);
+  modal.show();
+  setTimeout(() => {
+    const sel = document.getElementById('stockInProductSelect');
+    if (sel) sel.value = pId;
+  }, 300);
+}
+
+function openDirectStockOut(pId, name, curQty) {
+  const modalEl = document.getElementById('quickStockOutModal');
+  const modal = new bootstrap.Modal(modalEl);
+  modal.show();
+  setTimeout(() => {
+    const sel = document.getElementById('stockOutProductSelect');
+    if (sel) sel.value = pId;
+  }, 300);
+}
+</script>
+{% endblock %}

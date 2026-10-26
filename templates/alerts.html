@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Low Stock Alerts - Smart Inventory System{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Automated Low-Stock Alerts</h1>
+    <p class="page-subtitle">Real-time surveillance of stock levels requiring purchase replenishment or emergency vendor orders.</p>
+  </div>
+  <div class="header-action-group">
+    <a href="{{ url_for('export_low_stock_csv') }}" class="btn btn-outline-custom">
+      <i class="bi bi-download"></i> Export Alerts CSV
+    </a>
+  </div>
+</div>
+
+<!-- Alert Metrics Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="stat-info">
+        <span class="stat-label">Total Attention Items</span>
+        <span class="stat-value text-danger" id="alertTotalCount">-</span>
+        <span class="stat-meta text-muted"><i class="bi bi-bell-fill me-1"></i> Require Action</span>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-red">
+        <i class="bi bi-exclamation-octagon"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="stat-info">
+        <span class="stat-label">Critical: Out of Stock</span>
+        <span class="stat-value text-danger" id="alertOutCount">-</span>
+        <span class="stat-meta text-danger"><i class="bi bi-x-circle-fill me-1"></i> Zero Units (Depleted)</span>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-red">
+        <i class="bi bi-dash-circle-dotted"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="stat-info">
+        <span class="stat-label">Warning: Low Stock</span>
+        <span class="stat-value text-warning" id="alertLowCount">-</span>
+        <span class="stat-meta text-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i> At / Below Minimum</span>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-amber">
+        <i class="bi bi-exclamation-triangle"></i>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Alerts Table Card -->
+<div class="card-custom">
+  <div class="card-custom-header">
+    <h3 class="card-custom-title">
+      <i class="bi bi-shield-exclamation text-warning"></i> Active Replenishment Triggers
+    </h3>
+    <button class="btn btn-sm btn-outline-custom" onclick="loadAlerts()">
+      <i class="bi bi-arrow-clockwise"></i> Refresh
+    </button>
+  </div>
+
+  <div id="alertsEmptyState" class="empty-state d-none py-5">
+    <div class="empty-state-icon" style="background-color: var(--success-bg); color: var(--success);">
+      <i class="bi bi-check2-circle"></i>
+    </div>
+    <div class="empty-state-title">Inventory Health Optimal!</div>
+    <p class="empty-state-text">No products currently breach minimum safety thresholds.</p>
+  </div>
+
+  <div class="table-custom-wrapper border-0" id="alertsTableWrapper">
+    <table class="table-custom">
+      <thead>
+        <tr>
+          <th>Severity</th>
+          <th>Product / SKU</th>
+          <th>Category</th>
+          <th>Current Stock</th>
+          <th>Safety Threshold</th>
+          <th>Recommended Order</th>
+          <th>Primary Supplier</th>
+          <th class="text-end">Quick Action</th>
+        </tr>
+      </thead>
+      <tbody id="alertsTableBody">
+        <!-- Loaded via JS -->
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let alertsData = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadAlerts();
+});
+
+async function loadAlerts() {
+  try {
+    const res = await fetch('/api/alerts');
+    const data = await res.json();
+    if (!data.success) return;
+
+    alertsData = data.alerts;
+    document.getElementById('alertTotalCount').textContent = data.total_alerts;
+    document.getElementById('alertOutCount').textContent = data.out_of_stock_count;
+    document.getElementById('alertLowCount').textContent = data.low_stock_count;
+
+    renderAlertsTable(alertsData);
+  } catch (err) {
+    console.error('Failed to load alerts:', err);
+  }
+}
+
+function renderAlertsTable(alerts) {
+  const tbody = document.getElementById('alertsTableBody');
+  const emptyState = document.getElementById('alertsEmptyState');
+  const wrapper = document.getElementById('alertsTableWrapper');
+
+  if (!alerts || alerts.length === 0) {
+    emptyState.classList.remove('d-none');
+    wrapper.classList.add('d-none');
+    return;
+  }
+
+  emptyState.classList.add('d-none');
+  wrapper.classList.remove('d-none');
+
+  let html = '';
+  alerts.forEach(a => {
+    const isOut = a.quantity === 0;
+    const badgeClass = isOut ? 'badge-status-danger' : 'badge-status-warning';
+    const icon = isOut ? 'bi-x-octagon-fill' : 'bi-exclamation-triangle-fill';
+
+    html += `
+      <tr>
+        <td>
+          <span class="badge-status ${badgeClass}">
+            <i class="bi ${icon}"></i> ${escapeHtml(a.status)}
+          </span>
+        </td>
+        <td>
+          <a href="/products/${a.id}" class="fw-bold text-decoration-none d-block text-truncate" style="max-width: 240px;">
+            ${escapeHtml(a.name)}
+          </a>
+          <span class="font-monospace small text-muted">${escapeHtml(a.sku)}</span>
+        </td>
+        <td>
+          <span class="badge bg-secondary-subtle text-secondary">${escapeHtml(a.category)}</span>
+        </td>
+        <td>
+          <span class="fw-bold fs-6 ${isOut ? 'text-danger' : 'text-warning'}">${a.quantity}</span>
+          <span class="small text-muted">${escapeHtml(a.unit)}</span>
+        </td>
+        <td>
+          <span class="text-muted small">${a.minimum_stock} ${escapeHtml(a.unit)}</span>
+        </td>
+        <td>
+          <span class="badge bg-primary-subtle text-primary fw-bold px-2 py-1">
+            +${a.suggested_replenish} ${escapeHtml(a.unit)}
+          </span>
+          <div class="text-muted" style="font-size: 0.72rem;">Target: ${a.target_stock} units</div>
+        </td>
+        <td>
+          <div class="fw-semibold small">${escapeHtml(a.supplier_name)}</div>
+          <div class="text-muted" style="font-size: 0.72rem;">${escapeHtml(a.supplier_contact)}</div>
+        </td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-primary-custom" style="background-color: var(--success); border-color: var(--success);" onclick="triggerReplenish(${a.id}, ${a.suggested_replenish})">
+            <i class="bi bi-box-arrow-in-down"></i> Restock
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+}
+
+function triggerReplenish(productId, suggestedQty) {
+  const modalEl = document.getElementById('quickStockInModal');
+  const modal = new bootstrap.Modal(modalEl);
+  modal.show();
+
+  setTimeout(() => {
+    const prodSelect = document.getElementById('stockInProductSelect');
+    const qtyInput = document.getElementById('stockInQuantity');
+    const refInput = document.getElementById('stockInRef');
+
+    if (prodSelect) prodSelect.value = productId;
+    if (qtyInput) qtyInput.value = suggestedQty;
+    if (refInput) refInput.value = `REPLENISH-${Date.now().toString().slice(-6)}`;
+  }, 300);
+}
+</script>
+{% endblock %}

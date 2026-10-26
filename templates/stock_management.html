@@ -1,0 +1,433 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Management - Smart Inventory System{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Stock Operations</h1>
+    <p class="page-subtitle">Perform stock receipts, dispatches, and warehouse count adjustments.</p>
+  </div>
+  <div class="header-action-group">
+    <a href="{{ url_for('transactions_page') }}" class="btn btn-outline-custom">
+      <i class="bi bi-clock-history"></i> View Audit Log
+    </a>
+  </div>
+</div>
+
+<!-- Operation Tabs Card -->
+<div class="card-custom mb-4">
+  <div class="card-custom-header p-0">
+    <ul class="nav nav-tabs border-0 w-100" id="stockOpTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active px-4 py-3 fw-bold border-0 rounded-0 d-flex align-items-center gap-2" id="stockin-tab" data-bs-toggle="tab" data-bs-target="#stockin-pane" type="button" role="tab">
+          <i class="bi bi-box-arrow-in-down text-success fs-5"></i> Stock-In (Receive Inventory)
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link px-4 py-3 fw-bold border-0 rounded-0 d-flex align-items-center gap-2" id="stockout-tab" data-bs-toggle="tab" data-bs-target="#stockout-pane" type="button" role="tab">
+          <i class="bi bi-box-arrow-up text-danger fs-5"></i> Stock-Out (Dispatch / Issue)
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link px-4 py-3 fw-bold border-0 rounded-0 d-flex align-items-center gap-2" id="adjust-tab" data-bs-toggle="tab" data-bs-target="#adjust-pane" type="button" role="tab">
+          <i class="bi bi-sliders text-warning fs-5"></i> Stock Adjustment (Audit Correction)
+        </button>
+      </li>
+    </ul>
+  </div>
+
+  <div class="card-custom-body p-4">
+    <div class="tab-content" id="stockOpTabContent">
+      <!-- ================================================================ -->
+      <!-- TAB 1: STOCK IN                                                  -->
+      <!-- ================================================================ -->
+      <div class="tab-pane fade show active" id="stockin-pane" role="tabpanel">
+        <form id="pageStockInForm">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Select Product <span class="text-danger">*</span></label>
+              <select class="form-select form-select-custom" id="tabInProduct" required>
+                <option value="">-- Choose Product --</option>
+              </select>
+              <div id="tabInStockHint" class="form-text mt-1 text-muted small"></div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Quantity Received <span class="text-danger">*</span></label>
+              <input type="number" min="1" class="form-control form-control-custom" id="tabInQuantity" placeholder="e.g. 50" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Reference / PO #</label>
+              <input type="text" class="form-control form-control-custom" id="tabInRef" placeholder="e.g. PO-2026-901">
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Supplier Source</label>
+              <select class="form-select form-select-custom" id="tabInSupplier">
+                <option value="">-- Product Default Supplier --</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Receiving Reason</label>
+              <select class="form-select form-select-custom" id="tabInReason">
+                <option value="Purchase Order Delivery">Purchase Order Delivery</option>
+                <option value="Customer Return Restock">Customer Return Restock</option>
+                <option value="Transfer In">Transfer In</option>
+                <option value="Production Batch Entry">Production Batch Entry</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Receiving Notes / Remarks</label>
+              <textarea class="form-control form-control-custom" id="tabInNotes" rows="2" placeholder="Quality check passed, stored in Bay A-3..."></textarea>
+            </div>
+
+            <div class="col-12 pt-2">
+              <button type="submit" class="btn btn-primary-custom" style="background-color: var(--success); border-color: var(--success);">
+                <i class="bi bi-box-arrow-in-down"></i> Record Stock In
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- ================================================================ -->
+      <!-- TAB 2: STOCK OUT                                                 -->
+      <!-- ================================================================ -->
+      <div class="tab-pane fade" id="stockout-pane" role="tabpanel">
+        <form id="pageStockOutForm">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Select Product <span class="text-danger">*</span></label>
+              <select class="form-select form-select-custom" id="tabOutProduct" required>
+                <option value="">-- Choose Product --</option>
+              </select>
+              <div id="tabOutStockHint" class="form-text mt-1 text-muted small"></div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Quantity to Remove <span class="text-danger">*</span></label>
+              <input type="number" min="1" class="form-control form-control-custom" id="tabOutQuantity" placeholder="e.g. 10" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Dispatch / SO #</label>
+              <input type="text" class="form-control form-control-custom" id="tabOutRef" placeholder="e.g. SO-88321">
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Removal Reason <span class="text-danger">*</span></label>
+              <select class="form-select form-select-custom" id="tabOutReason" required>
+                <option value="Customer Order Fulfillment">Customer Order Fulfillment</option>
+                <option value="Damaged / Scrap">Damaged / Scrap</option>
+                <option value="Expired Product">Expired Product</option>
+                <option value="Internal Office Use">Internal Office Use</option>
+                <option value="Defective Vendor Return">Defective Vendor Return</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Notes / Work Order</label>
+              <input type="text" class="form-control form-control-custom" id="tabOutNotes" placeholder="Customer invoice # or dispatch carrier...">
+            </div>
+
+            <div class="col-12 pt-2">
+              <button type="submit" class="btn btn-primary-custom" style="background-color: var(--danger); border-color: var(--danger);">
+                <i class="bi bi-box-arrow-up"></i> Record Stock Out
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- ================================================================ -->
+      <!-- TAB 3: STOCK ADJUSTMENT                                          -->
+      <!-- ================================================================ -->
+      <div class="tab-pane fade" id="adjust-pane" role="tabpanel">
+        <form id="pageStockAdjustForm">
+          <div class="alert alert-info small d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-info-circle-fill fs-5"></i>
+            <div>Use Stock Adjustment when physical shelf count deviates from system records (e.g. after a physical inventory cycle audit).</div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Select Product to Reconcile <span class="text-danger">*</span></label>
+              <select class="form-select form-select-custom" id="tabAdjProduct" required>
+                <option value="">-- Choose Product --</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">System Stock (Current)</label>
+              <input type="text" class="form-control form-control-custom bg-light" id="tabAdjCurrentStock" value="-" readonly>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Actual Physical Count <span class="text-danger">*</span></label>
+              <input type="number" min="0" class="form-control form-control-custom" id="tabAdjActualQty" placeholder="Actual count" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Adjustment Reason <span class="text-danger">*</span></label>
+              <select class="form-select form-select-custom" id="tabAdjReason" required>
+                <option value="Periodic Physical Inventory Audit">Periodic Physical Inventory Audit</option>
+                <option value="Shrinkage / Unaccounted Discrepancy">Shrinkage / Unaccounted Discrepancy</option>
+                <option value="Found Unrecorded Stock">Found Unrecorded Stock</option>
+                <option value="Packaging Damage Write-off">Packaging Damage Write-off</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Audit Batch Ref #</label>
+              <input type="text" class="form-control form-control-custom" id="tabAdjRef" placeholder="AUDIT-2026-Q1">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Audit Findings & Notes</label>
+              <textarea class="form-control form-control-custom" id="tabAdjNotes" rows="2" placeholder="Auditor name and reconciliation justification..."></textarea>
+            </div>
+
+            <div class="col-12 pt-2">
+              <button type="submit" class="btn btn-warning fw-bold text-dark">
+                <i class="bi bi-sliders"></i> Apply Physical Adjustment
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Stock Operations Ledger -->
+<div class="card-custom">
+  <div class="card-custom-header">
+    <h3 class="card-custom-title"><i class="bi bi-list-check text-secondary"></i> Live Operations Log</h3>
+    <a href="{{ url_for('transactions_page') }}" class="btn btn-sm btn-outline-custom">Full History</a>
+  </div>
+  <div class="table-custom-wrapper border-0">
+    <table class="table-custom">
+      <thead>
+        <tr>
+          <th>Date & Time</th>
+          <th>Product Name & SKU</th>
+          <th>Operation</th>
+          <th>Quantity Delta</th>
+          <th>Previous Stock</th>
+          <th>Updated Balance</th>
+          <th>Reference #</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+      <tbody id="stockOpHistoryBody">
+        <!-- Rendered via JS -->
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let productsCache = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadOperationProducts();
+  loadOperationSuppliers();
+  loadOperationsLog();
+
+  // Stock-In Submit
+  document.getElementById('pageStockInForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      product_id: document.getElementById('tabInProduct').value,
+      quantity: document.getElementById('tabInQuantity').value,
+      supplier_id: document.getElementById('tabInSupplier').value,
+      reference_number: document.getElementById('tabInRef').value,
+      reason: document.getElementById('tabInReason').value,
+      notes: document.getElementById('tabInNotes').value
+    };
+
+    try {
+      const res = await fetch('/api/stock/in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message, 'success');
+        document.getElementById('pageStockInForm').reset();
+        document.getElementById('tabInStockHint').textContent = '';
+        loadOperationProducts();
+        loadOperationsLog();
+        initAlertsDropdown();
+      } else {
+        showToast(data.error || 'Failed to record stock in', 'danger');
+      }
+    } catch (err) {
+      showToast('Network error processing stock in', 'danger');
+    }
+  });
+
+  // Stock-Out Submit
+  document.getElementById('pageStockOutForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      product_id: document.getElementById('tabOutProduct').value,
+      quantity: document.getElementById('tabOutQuantity').value,
+      reason: document.getElementById('tabOutReason').value,
+      reference_number: document.getElementById('tabOutRef').value,
+      notes: document.getElementById('tabOutNotes').value
+    };
+
+    try {
+      const res = await fetch('/api/stock/out', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message, 'success');
+        document.getElementById('pageStockOutForm').reset();
+        document.getElementById('tabOutStockHint').textContent = '';
+        loadOperationProducts();
+        loadOperationsLog();
+        initAlertsDropdown();
+      } else {
+        showToast(data.error || 'Failed to record stock out', 'danger');
+      }
+    } catch (err) {
+      showToast('Network error processing stock out', 'danger');
+    }
+  });
+
+  // Stock Adjustment Submit
+  document.getElementById('pageStockAdjustForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      product_id: document.getElementById('tabAdjProduct').value,
+      actual_quantity: document.getElementById('tabAdjActualQty').value,
+      reason: document.getElementById('tabAdjReason').value,
+      reference_number: document.getElementById('tabAdjRef').value,
+      notes: document.getElementById('tabAdjNotes').value
+    };
+
+    try {
+      const res = await fetch('/api/stock/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message, 'success');
+        document.getElementById('pageStockAdjustForm').reset();
+        document.getElementById('tabAdjCurrentStock').value = '-';
+        loadOperationProducts();
+        loadOperationsLog();
+        initAlertsDropdown();
+      } else {
+        showToast(data.error || 'Adjustment failed', 'danger');
+      }
+    } catch (err) {
+      showToast('Network error recording adjustment', 'danger');
+    }
+  });
+
+  // Dynamic hints when selecting product
+  document.getElementById('tabInProduct').addEventListener('change', (e) => {
+    const p = productsCache.find(x => x.id == e.target.value);
+    document.getElementById('tabInStockHint').textContent = p ? `Current stock: ${p.quantity} ${p.unit}` : '';
+  });
+
+  document.getElementById('tabOutProduct').addEventListener('change', (e) => {
+    const p = productsCache.find(x => x.id == e.target.value);
+    document.getElementById('tabOutStockHint').textContent = p ? `Available to dispatch: ${p.quantity} ${p.unit}` : '';
+  });
+
+  document.getElementById('tabAdjProduct').addEventListener('change', (e) => {
+    const p = productsCache.find(x => x.id == e.target.value);
+    document.getElementById('tabAdjCurrentStock').value = p ? `${p.quantity} ${p.unit}` : '-';
+  });
+});
+
+async function loadOperationProducts() {
+  try {
+    const res = await fetch('/api/products');
+    const data = await res.json();
+    if (data.success) {
+      productsCache = data.products;
+      const selects = ['tabInProduct', 'tabOutProduct', 'tabAdjProduct'];
+      selects.forEach(id => {
+        const el = document.getElementById(id);
+        const curVal = el.value;
+        let html = '<option value="">-- Choose Product --</option>';
+        productsCache.forEach(p => {
+          html += `<option value="${p.id}" ${p.id == curVal ? 'selected' : ''}>
+            ${escapeHtml(p.name)} (${escapeHtml(p.sku)}) - Stock: ${p.quantity} ${escapeHtml(p.unit)}
+          </option>`;
+        });
+        el.innerHTML = html;
+      });
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function loadOperationSuppliers() {
+  try {
+    const res = await fetch('/api/suppliers');
+    const data = await res.json();
+    if (data.success) {
+      const el = document.getElementById('tabInSupplier');
+      let html = '<option value="">-- Product Default Supplier --</option>';
+      data.suppliers.forEach(s => {
+        html += `<option value="${s.id}">${escapeHtml(s.supplier_name)}</option>`;
+      });
+      el.innerHTML = html;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function loadOperationsLog() {
+  try {
+    const res = await fetch('/api/dashboard/recent-activity?limit=10');
+    const data = await res.json();
+    const tbody = document.getElementById('stockOpHistoryBody');
+    if (!data.success || !data.activities) return;
+
+    let html = '';
+    data.activities.forEach(act => {
+      let badgeClass = 'badge-status-secondary';
+      if (act.transaction_type === 'Stock In') badgeClass = 'badge-status-success';
+      else if (act.transaction_type === 'Stock Out') badgeClass = 'badge-status-danger';
+      else if (act.transaction_type === 'Stock Adjustment') badgeClass = 'badge-status-warning';
+      else if (act.transaction_type === 'Opening Stock') badgeClass = 'badge-status-info';
+
+      html += `
+        <tr>
+          <td class="small fw-semibold">${formatDate(act.date_time)}</td>
+          <td>
+            <div class="fw-bold text-truncate" style="max-width: 200px;">${escapeHtml(act.product_name)}</div>
+            <div class="small text-muted font-monospace">${escapeHtml(act.sku)}</div>
+          </td>
+          <td><span class="badge-status ${badgeClass}">${escapeHtml(act.transaction_type)}</span></td>
+          <td>
+            <span class="fw-bold ${act.quantity_changed >= 0 ? 'text-success' : 'text-danger'}">
+              ${act.quantity_changed > 0 ? '+' : ''}${act.quantity_changed}
+            </span>
+          </td>
+          <td class="text-muted">${act.previous_quantity}</td>
+          <td class="fw-bold">${act.new_quantity}</td>
+          <td class="font-monospace small">${escapeHtml(act.reference_number)}</td>
+          <td class="small text-muted">${escapeHtml(act.reason)}</td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html;
+  } catch (err) {
+    console.error(err);
+  }
+}
+</script>
+{% endblock %}

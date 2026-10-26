@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory Transactions Log - Smart Inventory System{% endblock %}
+
+{% block content %}
+<div class="page-header-row">
+  <div>
+    <h1 class="page-title">Transaction Audit Ledger</h1>
+    <p class="page-subtitle">Permanent, tamper-evident record of all warehouse receipts, dispatches, and audit adjustments.</p>
+  </div>
+  <div class="header-action-group">
+    <button class="btn btn-outline-custom" id="exportTransCsvBtn">
+      <i class="bi bi-download"></i> Export Filtered CSV
+    </button>
+  </div>
+</div>
+
+<!-- Filters Card -->
+<div class="card-custom mb-4">
+  <div class="card-custom-body">
+    <div class="row g-3 align-items-center">
+      <div class="col-lg-4 col-md-6">
+        <div class="position-relative">
+          <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+          <input type="text" class="form-control form-control-custom ps-5" id="transSearchInput" placeholder="Search by SKU, product name, or ref #...">
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <select class="form-select form-select-custom" id="transTypeFilter">
+          <option value="All">All Transaction Types</option>
+          <option value="Stock In">Stock In (Receipts)</option>
+          <option value="Stock Out">Stock Out (Dispatches)</option>
+          <option value="Stock Adjustment">Stock Adjustment (Audit)</option>
+          <option value="Opening Stock">Opening Stock (Initial)</option>
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <input type="date" class="form-control form-control-custom" id="transStartDate" title="From Date">
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <input type="date" class="form-control form-control-custom" id="transEndDate" title="To Date">
+      </div>
+      <div class="col-lg-1 col-md-12 text-end">
+        <button class="btn btn-outline-custom w-100" id="resetTransFiltersBtn" title="Reset Filters">
+          <i class="bi bi-arrow-counterclockwise"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Transactions Table Card -->
+<div class="card-custom">
+  <div class="card-custom-header">
+    <div class="d-flex align-items-center gap-2">
+      <h3 class="card-custom-title"><i class="bi bi-clock-history text-secondary"></i> Transaction Records</h3>
+      <span class="badge bg-secondary-subtle text-secondary small" id="transCountBadge">0 Records</span>
+    </div>
+  </div>
+
+  <div id="transEmptyState" class="empty-state d-none">
+    <div class="empty-state-icon"><i class="bi bi-inbox"></i></div>
+    <div class="empty-state-title">No Transactions Found</div>
+    <p class="empty-state-text">No recorded stock movements match your query filters.</p>
+  </div>
+
+  <div class="table-custom-wrapper border-0" id="transTableWrapper">
+    <table class="table-custom">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Date & Time</th>
+          <th>Product / SKU</th>
+          <th>Transaction Type</th>
+          <th>Quantity Delta</th>
+          <th>Previous Balance</th>
+          <th>Resulting Balance</th>
+          <th>Reference #</th>
+          <th>Reason & Details</th>
+          <th>Supplier</th>
+        </tr>
+      </thead>
+      <tbody id="transTableBody">
+        <!-- Loaded via JS -->
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  loadTransactions();
+
+  document.getElementById('transSearchInput').addEventListener('input', debounce(loadTransactions, 250));
+  document.getElementById('transTypeFilter').addEventListener('change', loadTransactions);
+  document.getElementById('transStartDate').addEventListener('change', loadTransactions);
+  document.getElementById('transEndDate').addEventListener('change', loadTransactions);
+
+  document.getElementById('resetTransFiltersBtn').addEventListener('click', () => {
+    document.getElementById('transSearchInput').value = '';
+    document.getElementById('transTypeFilter').value = 'All';
+    document.getElementById('transStartDate').value = '';
+    document.getElementById('transEndDate').value = '';
+    loadTransactions();
+  });
+
+  document.getElementById('exportTransCsvBtn').addEventListener('click', () => {
+    const search = document.getElementById('transSearchInput').value.trim();
+    const type = document.getElementById('transTypeFilter').value;
+    const start = document.getElementById('transStartDate').value;
+    const end = document.getElementById('transEndDate').value;
+
+    const url = `/export/transactions/csv?search=${encodeURIComponent(search)}&type=${encodeURIComponent(type)}&start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`;
+    window.location.href = url;
+  });
+});
+
+async function loadTransactions() {
+  const search = document.getElementById('transSearchInput').value.trim();
+  const type = document.getElementById('transTypeFilter').value;
+  const start = document.getElementById('transStartDate').value;
+  const end = document.getElementById('transEndDate').value;
+
+  const url = `/api/transactions?search=${encodeURIComponent(search)}&type=${encodeURIComponent(type)}&start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}&limit=150`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.success) return;
+
+    renderTransactionsTable(data.transactions);
+    document.getElementById('transCountBadge').textContent = `${data.count} Records`;
+  } catch (err) {
+    console.error('Failed to load transactions:', err);
+  }
+}
+
+function renderTransactionsTable(transactions) {
+  const tbody = document.getElementById('transTableBody');
+  const emptyState = document.getElementById('transEmptyState');
+  const wrapper = document.getElementById('transTableWrapper');
+
+  if (!transactions || transactions.length === 0) {
+    emptyState.classList.remove('d-none');
+    wrapper.classList.add('d-none');
+    return;
+  }
+
+  emptyState.classList.add('d-none');
+  wrapper.classList.remove('d-none');
+
+  let html = '';
+  transactions.forEach(t => {
+    let badgeClass = 'badge-status-secondary';
+    let icon = 'bi-arrow-left-right';
+
+    if (t.transaction_type === 'Stock In') {
+      badgeClass = 'badge-status-success';
+      icon = 'bi-box-arrow-in-down';
+    } else if (t.transaction_type === 'Stock Out') {
+      badgeClass = 'badge-status-danger';
+      icon = 'bi-box-arrow-up';
+    } else if (t.transaction_type === 'Opening Stock') {
+      badgeClass = 'badge-status-info';
+      icon = 'bi-plus-circle';
+    } else if (t.transaction_type === 'Stock Adjustment') {
+      badgeClass = 'badge-status-warning';
+      icon = 'bi-sliders';
+    }
+
+    html += `
+      <tr>
+        <td class="text-muted small">#${t.id}</td>
+        <td class="small fw-semibold text-nowrap">${t.created_at}</td>
+        <td>
+          <div class="fw-bold text-truncate" style="max-width: 220px;">
+            ${t.product_id ? `<a href="/products/${t.product_id}">${escapeHtml(t.product_name)}</a>` : escapeHtml(t.product_name)}
+          </div>
+          <div class="small text-muted font-monospace">${escapeHtml(t.product_sku)}</div>
+        </td>
+        <td>
+          <span class="badge-status ${badgeClass} text-nowrap">
+            <i class="bi ${icon}"></i> ${escapeHtml(t.transaction_type)}
+          </span>
+        </td>
+        <td>
+          <span class="fw-bold ${t.quantity_changed >= 0 ? 'text-success' : 'text-danger'}">
+            ${t.quantity_changed > 0 ? '+' : ''}${t.quantity_changed}
+          </span>
+        </td>
+        <td class="text-muted">${t.previous_quantity}</td>
+        <td class="fw-bold">${t.new_quantity}</td>
+        <td><span class="font-monospace small">${escapeHtml(t.reference_number)}</span></td>
+        <td>
+          <div class="small fw-medium">${escapeHtml(t.reason)}</div>
+          ${t.notes ? `<div class="text-muted" style="font-size: 0.72rem;">${escapeHtml(t.notes)}</div>` : ''}
+        </td>
+        <td><span class="small text-muted">${escapeHtml(t.supplier_name)}</span></td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+}
+
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
+</script>
+{% endblock %}
